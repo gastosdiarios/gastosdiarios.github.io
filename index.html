@@ -211,7 +211,8 @@ svg text{font-family:inherit}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
 /* ---------- mobile ---------- */
-#lastMoves,#movTable,#impHist{overflow-x:auto;-webkit-overflow-scrolling:touch}
+#lastMoves,#movTable,#impHist,#anList,#propTable{overflow-x:auto;-webkit-overflow-scrolling:touch}
+td.edita{cursor:pointer;text-decoration:underline dotted var(--ink-3);text-underline-offset:3px}
 nav.tabs button{min-height:48px}
 @media(max-width:560px){
   main{padding-top:16px}
@@ -310,6 +311,10 @@ nav.tabs button{min-height:48px}
   </div>
   <h2 class="st">Por categoría</h2>
   <div class="card" id="anCats"></div>
+
+  <h2 class="st">Todos los movimientos del período</h2>
+  <p class="mut" style="margin-bottom:10px">Todo editable: la categoría con el desplegable, el tipo tocando la etiqueta, el monto tocándolo, y la × borra.</p>
+  <div class="card" style="padding:8px 12px" id="anList"></div>
   <p class="mut" style="margin-top:12px" id="anIng"></p>
 </section>
 
@@ -401,6 +406,10 @@ nav.tabs button{min-height:48px}
   </div>
   <p class="mut" style="margin-bottom:10px">Tocá la etiqueta <span class="pill fijo">fijo ⇄</span> / <span class="pill boludez">boludez ⇄</span> para reclasificar un gasto. La × lo borra.</p>
   <div class="card" style="padding:8px 12px" id="movTable"></div>
+
+  <h2 class="st">Propinas del mes seleccionado</h2>
+  <p class="mut" style="margin-bottom:10px">Tocá el monto para corregirlo. La × la borra. Usa el mismo selector de mes de arriba.</p>
+  <div class="card" style="padding:8px 12px" id="propTable"></div>
 </section>
 
 <!-- ================= IMPORTAR ================= -->
@@ -483,6 +492,7 @@ nav.tabs button{min-height:48px}
           <input type="number" id="cfgDias" inputmode="numeric" min="1" max="31" step="1">
         </div>
       </div>
+      <p class="mut" style="margin-bottom:12px">El Patrimonio del Dashboard arranca de este conteo y se mueve solo: suma cada propina e ingreso que cargues y resta cada gasto (los extractos importados no lo tocan, esa plata ya estaba contada). Cuando vuelvas a contar tu plata y guardes, el punto de partida se reinicia.</p>
       <button class="btn wide" id="cfgSave">Guardar parámetros</button>
     </div>
 
@@ -582,7 +592,7 @@ const Store = (() => {
   const KEY = 'finanzas_os_v1';
   const defaults = () => ({
     version: 1,
-    config: { sueldoFijo:0, metaAhorroUSD:200, patARS:0, patUSD:0, diasTrabajo:22 },
+    config: { sueldoFijo:0, metaAhorroUSD:200, patARS:0, patUSD:0, diasTrabajo:22, patSetAt:0 },
     configTs: 0,
     fx: { valor:null, fuente:null, ts:0, manual:false },
     propinas: [],          // {id, fecha, monto, mt}
@@ -598,6 +608,9 @@ const Store = (() => {
   state.config = Object.assign(defaults().config, state.config||{});
   state.fx = Object.assign(defaults().fx, state.fx||{});
   state.sync = Object.assign(defaults().sync, state.sync||{});
+  // migración: el patrimonio dinámico arranca a contar desde ahora, no retroactivo
+  // (lo cargado antes de este momento ya estaba reflejado en el conteo manual)
+  if (!state.config.patSetAt) state.config.patSetAt = Date.now();
   let onSaveCb = null;
   const save = () => {
     try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ No se pudo guardar (storage lleno)'); }
@@ -893,10 +906,19 @@ const Engine = (() => {
              ingresoProy, fijosProy, metaARS, presupuestoBolud, restante,
              limiteDiario, boludProy, ahorroProy, gastadoHoy };
   }
+  /* Patrimonio dinámico: conteo base + todo lo registrado a mano DESPUÉS de guardar el conteo.
+     Los extractos importados (csv/pdf) no ajustan: esa plata ya estaba contada en el banco. */
   function patrimonio(){
     const rate = FX.rate();
-    const ars = S.config.patARS + S.config.patUSD * rate;
-    return { ars, usd: rate? ars/rate : 0 };
+    const t0 = S.config.patSetAt || 0;
+    let delta = 0;
+    for (const p of S.propinas) if ((p.mt||0) > t0) delta += p.monto;
+    for (const m of S.movimientos){
+      if (m.origen !== 'manual' || (m.mt||0) <= t0) continue;
+      delta += m.tipo==='ingreso' ? m.monto : -m.monto;
+    }
+    const ars = S.config.patARS + S.config.patUSD * rate + delta;
+    return { ars, usd: rate? ars/rate : 0, delta };
   }
   function categoriasBoludez(){
     const c = ctx();
@@ -1200,6 +1222,22 @@ const UI = (() => {
     $('#movMes').innerHTML = months.map(mk=>`<option value="${mk}" ${mk===movMonth?'selected':''}>${lblMes(mk)}</option>`).join('');
     const movs = S.movimientos.filter(m=>monthKey(m.fecha)===movMonth).sort((a,b)=>b.fecha.localeCompare(a.fecha));
     renderMovList($('#movTable'), movs, true);
+    // propinas del mes seleccionado, editables
+    const r = FX.rate();
+    const props = S.propinas.filter(p=>monthKey(p.fecha)===movMonth).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    const totP = props.reduce((a,p)=>a+p.monto,0);
+    $('#propTable').innerHTML = props.length ? `<table>
+      <tr><th>Fecha</th><th class="r">ARS</th>${r?'<th class="r">USD</th>':''}<th></th></tr>
+      ${props.map(p=>`<tr>
+        <td class="num" style="white-space:nowrap">${p.fecha.slice(5)}</td>
+        <td class="r num edita" title="Tocar para corregir" onclick="UI.editProp('${p.id}')">${fmtARS(p.monto)}</td>
+        ${r?`<td class="r num duo">${fmtUSD(p.monto/r)}</td>`:''}
+        <td class="r"><button class="del" onclick="UI.rmProp('${p.id}')">×</button></td>
+      </tr>`).join('')}
+      <tr><td style="font-weight:700">Total · ${props.length} días</td>
+        <td class="r num" style="font-weight:700">${fmtARS(totP)}</td>
+        ${r?`<td class="r num duo">${fmtUSD(totP/r)}</td>`:''}<td></td></tr>
+    </table>` : '<div class="empty">Sin propinas cargadas este mes.</div>';
   }
 
   function renderImport(){
@@ -1341,6 +1379,20 @@ const UI = (() => {
       </p>`
       : '<div class="empty">Sin gastos en este período.</div>';
     $('#anIng').textContent = ing ? `Ingresos registrados en el período: ${fmtARS(ing)}${r?' ('+fmtUSD(ing/r)+')':''}.` : '';
+    // listado completo del período, editable
+    const list = movs.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    $('#anList').innerHTML = list.length ? `<table>
+      <tr><th>Fecha</th><th>Detalle</th><th>Categoría</th><th>Tipo</th><th class="r">ARS</th><th></th></tr>
+      ${list.map(m=>`<tr>
+        <td class="num" style="white-space:nowrap">${m.fecha.slice(5)}</td>
+        <td>${m.desc||'<span class="mut">—</span>'}${m.cuenta?` <span class="mut">· ${m.cuenta}</span>`:''}</td>
+        <td>${m.tipo==='ingreso' ? '<span class="mut">—</span>' :
+          `<select onchange="UI.setCat('${m.id}',this.value)" style="width:auto;font-size:12px;padding:4px 26px 4px 8px">${CATS.map(c=>`<option ${c===m.categoria?'selected':''}>${c}</option>`).join('')}</select>`}</td>
+        <td><span class="pill ${m.tipo}" ${m.tipo!=='ingreso'?`style="cursor:pointer;white-space:nowrap" title="Cambiar fijo↔boludez" onclick="UI.flip('${m.id}')"`:''}>${m.tipo}${m.tipo!=='ingreso'?' ⇄':''}</span></td>
+        <td class="r num edita" title="Tocar para corregir el monto" onclick="UI.editMonto('${m.id}')">${m.tipo==='ingreso'?'+':''}${fmtARS(m.monto)}</td>
+        <td class="r"><button class="del" onclick="UI.rm('${m.id}')">×</button></td>
+      </tr>`).join('')}
+    </table>` : '<div class="empty">Sin movimientos en este período.</div>';
   }
 
   function renderAll(){ renderDash(); renderCarga(); renderImport(); renderPlan(); renderAnalisis(); }
@@ -1393,8 +1445,12 @@ const UI = (() => {
     $('#cfgSave').onclick = ()=>{
       S.config.sueldoFijo = parseFloat($('#cfgSueldo').value)||0;
       S.config.metaAhorroUSD = parseFloat($('#cfgMeta').value)||0;
-      S.config.patARS = parseFloat($('#cfgPatARS').value)||0;
-      S.config.patUSD = parseFloat($('#cfgPatUSD').value)||0;
+      const nPatARS = parseFloat($('#cfgPatARS').value)||0;
+      const nPatUSD = parseFloat($('#cfgPatUSD').value)||0;
+      // si recontaste tu plata, el conteo pasa a ser el nuevo punto de partida
+      if (nPatARS !== S.config.patARS || nPatUSD !== S.config.patUSD) S.config.patSetAt = Date.now();
+      S.config.patARS = nPatARS;
+      S.config.patUSD = nPatUSD;
       S.config.diasTrabajo = clamp(parseFloat($('#cfgDias').value)||22,1,31);
       S.configTs = Date.now();
       Store.save(); toast('Parámetros guardados'); renderAll();
@@ -1455,7 +1511,29 @@ const UI = (() => {
     renderAll, bind,
     rm(id){ Ledger.delMov(id); renderAll(); },
     flip(id){ Ledger.toggleTipo(id); renderAll(); },
-    rmMeta(id){ S.metas = S.metas.filter(g=>g.id!==id); S.deleted.push(id); Store.save(); renderAll(); }
+    rmMeta(id){ S.metas = S.metas.filter(g=>g.id!==id); S.deleted.push(id); Store.save(); renderAll(); },
+    rmProp(id){ Ledger.delPropina(id); renderAll(); },
+    editProp(id){
+      const p = S.propinas.find(x=>x.id===id); if (!p) return;
+      const v = prompt('Propinas del '+p.fecha+' (ARS):', p.monto);
+      if (v===null) return;
+      const n = parseFloat(String(v).replace(',','.'));
+      if (n>0){ p.monto=n; p.mt=Date.now(); Store.save(); renderAll(); }
+      else if (n===0){ Ledger.delPropina(id); renderAll(); }
+      else toast('Monto inválido');
+    },
+    editMonto(id){
+      const m = S.movimientos.find(x=>x.id===id); if (!m) return;
+      const v = prompt('Monto de "'+(m.desc||m.categoria)+'" ('+m.fecha+', ARS):', m.monto);
+      if (v===null) return;
+      const n = parseFloat(String(v).replace(',','.'));
+      if (n>0){ m.monto=n; m.mt=Date.now(); Store.save(); renderAll(); }
+      else toast('Monto inválido');
+    },
+    setCat(id, cat){
+      const m = S.movimientos.find(x=>x.id===id); if (!m) return;
+      m.categoria = cat; m.mt = Date.now(); Store.save(); renderAll();
+    }
   };
 })();
 
