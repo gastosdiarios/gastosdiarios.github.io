@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#151513">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Finanzas">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Finanzas OS</title>
+<style>
+/* ============================================================
+   LUJO OPERATIVO — design system
+   Paleta: marfil / carbón / un solo acento (verde salvia oscuro)
+   Tipografía: sistema, números tabulares, jerarquía por peso y tamaño
+   ============================================================ */
+:root{
+  --bg:#F7F6F3;          /* marfil */
+  --surface:#FFFFFF;
+  --ink:#151513;         /* carbón */
+  --ink-2:#6B6A65;       /* gris cálido */
+  --ink-3:#A3A29B;
+  --line:#E7E5DF;
+  --accent:#2E5641;      /* verde salvia oscuro */
+  --accent-soft:#EAF0EC;
+  --danger:#9C3A2E;
+  --danger-soft:#F7ECEA;
+  --warn:#8A6D1F;
+  --warn-soft:#F6F0DE;
+  --radius:14px;
+  --shadow:0 1px 2px rgba(21,21,19,.04), 0 8px 24px rgba(21,21,19,.05);
+  --mono:'SF Mono',ui-monospace,'Cascadia Code',Menlo,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'Inter','Segoe UI',Roboto,sans-serif;
+  font-size:15px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:88px;
+}
+.num{font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+header.top{
+  position:sticky;top:0;z-index:50;background:rgba(247,246,243,.88);
+  backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.top-inner{display:flex;align-items:center;justify-content:space-between;height:56px}
+.brand{font-weight:700;letter-spacing:-.02em;font-size:16px}
+.brand span{color:var(--ink-3);font-weight:500}
+.fx-pill{
+  display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink-2);
+  background:var(--surface);border:1px solid var(--line);border-radius:99px;
+  padding:5px 12px;cursor:pointer;user-select:none;
+}
+.fx-pill b{color:var(--ink);font-weight:600}
+.fx-dot{width:6px;height:6px;border-radius:99px;background:var(--accent)}
+.fx-dot.stale{background:var(--warn)}
+
+/* ---------- nav ---------- */
+nav.tabs{
+  position:fixed;bottom:0;left:0;right:0;z-index:60;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);
+  display:flex;justify-content:center;gap:4px;padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom));
+}
+nav.tabs button{
+  flex:1;max-width:180px;border:0;background:none;cursor:pointer;
+  font:inherit;font-size:12px;font-weight:600;color:var(--ink-3);
+  padding:8px 4px;border-radius:10px;transition:.15s;
+  display:flex;flex-direction:column;align-items:center;gap:2px;
+}
+nav.tabs button .ico{font-size:17px;line-height:1}
+nav.tabs button.active{color:var(--ink);background:var(--bg)}
+
+/* ---------- secciones ---------- */
+main{padding-top:24px}
+section.view{display:none;animation:fade .18s ease}
+section.view.active{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+h1.vt{font-size:22px;font-weight:700;letter-spacing:-.03em;margin-bottom:2px}
+p.vs{color:var(--ink-2);font-size:13.5px;margin-bottom:22px}
+h2.st{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-3);margin:28px 0 12px}
+
+/* ---------- cards / grid ---------- */
+.grid{display:grid;gap:14px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:820px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:560px){.g2{grid-template-columns:1fr}.g3{grid-template-columns:1fr}}
+.card{
+  background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+  padding:20px;box-shadow:var(--shadow);
+}
+.kpi .lbl{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);margin-bottom:8px}
+.kpi .val{font-size:26px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.kpi .sub{font-size:12.5px;color:var(--ink-2);margin-top:6px}
+.kpi .val.ok{color:var(--accent)}
+.kpi .val.bad{color:var(--danger)}
+
+/* ---------- barra progreso ---------- */
+.bar{height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:12px}
+.bar i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .4s ease}
+.bar i.over{background:var(--danger)}
+
+/* ---------- alertas ---------- */
+.alert{
+  display:flex;gap:12px;align-items:flex-start;
+  border:1px solid var(--line);border-radius:var(--radius);
+  padding:14px 16px;margin-bottom:10px;background:var(--surface);font-size:13.5px;
+}
+.alert .tag{
+  flex-shrink:0;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 8px;border-radius:6px;margin-top:1px;
+}
+.alert.crit{border-color:#EBD3CF;background:var(--danger-soft)}
+.alert.crit .tag{background:var(--danger);color:#fff}
+.alert.warn{border-color:#EDE3C2;background:var(--warn-soft)}
+.alert.warn .tag{background:var(--warn);color:#fff}
+.alert.ok{border-color:#D7E3DB;background:var(--accent-soft)}
+.alert.ok .tag{background:var(--accent);color:#fff}
+.alert b{font-weight:650}
+
+/* ---------- formularios ---------- */
+label.f{display:block;font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+input,select,textarea{
+  width:100%;font:inherit;font-size:15px;color:var(--ink);
+  background:var(--bg);border:1px solid var(--line);border-radius:10px;
+  padding:10px 12px;outline:none;transition:border .15s;
+  -webkit-appearance:none;appearance:none;
+}
+input:focus,select:focus{border-color:var(--ink-2)}
+select{background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236B6A65' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+.frow{display:flex;gap:10px;margin-bottom:12px}
+.frow>div{flex:1}
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  font:inherit;font-size:14px;font-weight:650;cursor:pointer;
+  border:0;border-radius:10px;padding:11px 18px;transition:.15s;
+  background:var(--ink);color:#fff;
+}
+.btn:hover{opacity:.88}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.btn.accent{background:var(--accent)}
+.btn.sm{font-size:13px;padding:8px 13px}
+.btn.wide{width:100%}
+.btn:disabled{opacity:.4;cursor:default}
+
+/* segmentado fijo/boludez */
+.seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px;gap:3px}
+.seg button{
+  flex:1;border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;
+  color:var(--ink-2);padding:8px 6px;border-radius:8px;cursor:pointer;transition:.15s;
+}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(21,21,19,.1)}
+.seg button.on.fijo{color:var(--accent)}
+.seg button.on.boludez{color:var(--danger)}
+
+/* ---------- tablas / listas ---------- */
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td.r,th.r{text-align:right}
+.pill{font-size:11px;font-weight:700;padding:2.5px 8px;border-radius:6px;display:inline-block}
+.pill.fijo{background:var(--accent-soft);color:var(--accent)}
+.pill.boludez{background:var(--danger-soft);color:var(--danger)}
+.pill.ingreso{background:#E8EDF5;color:#2C4A73}
+.del{background:none;border:0;cursor:pointer;color:var(--ink-3);font-size:15px;padding:2px 6px;border-radius:6px}
+.del:hover{color:var(--danger);background:var(--danger-soft)}
+.empty{color:var(--ink-3);font-size:13.5px;text-align:center;padding:28px 10px}
+
+/* ---------- dropzone csv ---------- */
+.drop{
+  border:1.5px dashed var(--line);border-radius:var(--radius);
+  padding:34px 20px;text-align:center;color:var(--ink-2);font-size:13.5px;
+  cursor:pointer;transition:.15s;background:var(--surface);
+}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{color:var(--ink)}
+
+/* ---------- chart ---------- */
+.chart-wrap{overflow-x:auto}
+svg text{font-family:inherit}
+
+/* ---------- simulador ---------- */
+.cut-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.cut-row:last-child{border-bottom:0}
+.cut-row .cat{flex:1;font-weight:600;font-size:14px}
+.cut-row .cat small{display:block;font-weight:400;color:var(--ink-2);font-size:12px}
+.cut-row .pct{font-weight:700;color:var(--danger);font-size:14px;min-width:52px;text-align:right}
+.cut-row .amt{color:var(--ink-2);font-size:13px;min-width:110px;text-align:right}
+
+.duo{font-size:12.5px;color:var(--ink-3);font-weight:500}
+.hr{border:0;border-top:1px solid var(--line);margin:18px 0}
+.mut{color:var(--ink-2);font-size:13px}
+.toast{
+  position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(8px);
+  background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;
+  padding:10px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:.25s;z-index:99;
+  box-shadow:0 8px 24px rgba(21,21,19,.25);white-space:nowrap;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---------- mobile ---------- */
+#lastMoves,#movTable,#impHist{overflow-x:auto;-webkit-overflow-scrolling:touch}
+nav.tabs button{min-height:48px}
+@media(max-width:560px){
+  main{padding-top:16px}
+  h1.vt{font-size:20px}
+  .card{padding:16px}
+  .kpi .val{font-size:21px}
+  table{font-size:12.5px}
+  th,td{padding:8px 6px}
+  .frow{flex-direction:row;flex-wrap:wrap}
+  input,select{font-size:16px} /* evita el auto-zoom de iOS al enfocar */
+  .btn{padding:13px 18px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">Finanzas <span>OS</span></div>
+    <div class="fx-pill" id="fxPill" title="Tocar para actualizar / fijar manual">
+      <span class="fx-dot" id="fxDot"></span>
+      <span>USD blue</span><b class="num" id="fxVal">—</b>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ================= DASHBOARD ================= -->
+<section class="view active" id="v-dash">
+  <h1 class="vt">Dashboard Ejecutivo</h1>
+  <p class="vs" id="dashSub"></p>
+
+  <div id="alertBox"></div>
+
+  <div class="grid g4" style="margin-top:18px">
+    <div class="card kpi">
+      <div class="lbl">Patrimonio total</div>
+      <div class="val num" id="kPatARS">—</div>
+      <div class="sub duo num" id="kPatUSD">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl">Ahorro del mes</div>
+      <div class="val num" id="kAhorro">—</div>
+      <div class="sub num" id="kAhorroSub">—</div>
+      <div class="bar"><i id="kAhorroBar" style="width:0%"></i></div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl">Límite diario · boludeces</div>
+      <div class="val num" id="kLimite">—</div>
+      <div class="sub num" id="kLimiteSub">—</div>
+    </div>
+    <div class="card kpi">
+      <div class="lbl">Gastado hoy · boludeces</div>
+      <div class="val num" id="kHoy">—</div>
+      <div class="sub num" id="kHoySub">—</div>
+    </div>
+  </div>
+
+  <h2 class="st">Fijos vs boludeces · últimas 8 semanas</h2>
+  <div class="card chart-wrap"><div id="chart"></div></div>
+
+  <h2 class="st">Últimos movimientos</h2>
+  <p class="mut" style="margin:-6px 0 10px">Tocá la etiqueta de tipo para reclasificar: <span class="pill fijo">fijo ⇄</span> <span class="pill boludez">boludez ⇄</span></p>
+  <div class="card" style="padding:8px 12px" id="lastMoves"></div>
+</section>
+
+<!-- ================= CARGA ================= -->
+<section class="view" id="v-carga">
+  <h1 class="vt">Carga rápida</h1>
+  <p class="vs">Menos de 5 segundos por movimiento. Ese es el estándar.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h2 class="st" style="margin-top:0">Gasto</h2>
+      <div class="frow">
+        <div>
+          <label class="f">Monto (ARS)</label>
+          <input type="number" id="gMonto" inputmode="decimal" placeholder="0" min="0" step="any">
+        </div>
+        <div>
+          <label class="f">Fecha</label>
+          <input type="date" id="gFecha">
+        </div>
+      </div>
+      <div class="frow">
+        <div>
+          <label class="f">Categoría</label>
+          <select id="gCat"></select>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="f">Tipo</label>
+        <div class="seg" id="gTipo">
+          <button type="button" data-t="fijo" class="fijo">Fijo / No negociable</button>
+          <button type="button" data-t="boludez" class="on boludez">Boludez</button>
+        </div>
+      </div>
+      <div class="frow"><div>
+        <label class="f">Nota (opcional)</label>
+        <input type="text" id="gDesc" placeholder="Cena con amigas, Uber, etc.">
+      </div></div>
+      <button class="btn wide" id="gAdd">Registrar gasto</button>
+    </div>
+
+    <div>
+      <div class="card">
+        <h2 class="st" style="margin-top:0">Propinas del día</h2>
+        <div class="frow">
+          <div>
+            <label class="f">Monto (ARS)</label>
+            <input type="number" id="pMonto" inputmode="decimal" placeholder="0" min="0" step="any">
+          </div>
+          <div>
+            <label class="f">Fecha</label>
+            <input type="date" id="pFecha">
+          </div>
+        </div>
+        <button class="btn accent wide" id="pAdd">Registrar propinas</button>
+        <hr class="hr">
+        <div class="grid g2" style="gap:10px">
+          <div>
+            <div class="lbl" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">Promedio diario</div>
+            <div class="num" style="font-size:19px;font-weight:700" id="pProm">—</div>
+          </div>
+          <div>
+            <div class="lbl" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">Proyección mensual</div>
+            <div class="num" style="font-size:19px;font-weight:700" id="pProy">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
+        <h2 class="st" style="margin-top:0">Otro ingreso puntual</h2>
+        <div class="frow">
+          <div>
+            <label class="f">Monto (ARS)</label>
+            <input type="number" id="iMonto" inputmode="decimal" placeholder="0" min="0" step="any">
+          </div>
+          <div>
+            <label class="f">Concepto</label>
+            <input type="text" id="iDesc" placeholder="Venta, regalo…">
+          </div>
+        </div>
+        <button class="btn ghost wide" id="iAdd">Registrar ingreso</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:28px 0 8px">
+    <h2 class="st" style="margin:0">Movimientos</h2>
+    <select id="movMes" style="width:auto;font-size:13px;padding:6px 30px 6px 10px"></select>
+  </div>
+  <p class="mut" style="margin-bottom:10px">Tocá la etiqueta <span class="pill fijo">fijo ⇄</span> / <span class="pill boludez">boludez ⇄</span> para reclasificar un gasto. La × lo borra.</p>
+  <div class="card" style="padding:8px 12px" id="movTable"></div>
+</section>
+
+<!-- ================= IMPORTAR ================= -->
+<section class="view" id="v-import">
+  <h1 class="vt">Importador bancario</h1>
+  <p class="vs">Unificá los extractos de tus 3 cuentas en una sola base histórica. Acepta CSV y PDF; detecta columnas, montos y duplicados automáticamente.</p>
+
+  <div class="card">
+    <div class="frow">
+      <div>
+        <label class="f">Cuenta de origen</label>
+        <select id="impCuenta">
+          <option>Cuenta 1</option><option>Cuenta 2</option><option>Cuenta 3</option>
+        </select>
+      </div>
+    </div>
+    <div class="drop" id="drop">
+      <b>Arrastrá el extracto acá (PDF o CSV)</b> o tocá para elegir el archivo<br>
+      <span style="font-size:12px">PDF: detecta las líneas de movimientos con fecha y monto (formato argentino). CSV: acepta coma o punto y coma y montos con coma decimal. La primera lectura de un PDF necesita internet.</span>
+    </div>
+    <input type="file" id="fileIn" accept=".csv,.txt,.pdf,application/pdf" style="display:none">
+  </div>
+
+  <div id="impPreviewBox" style="display:none">
+    <h2 class="st">Previsualización</h2>
+    <div class="card">
+      <div class="grid g3" style="margin-bottom:14px">
+        <div><label class="f">Columna fecha</label><select id="mapFecha"></select></div>
+        <div><label class="f">Columna monto</label><select id="mapMonto"></select></div>
+        <div><label class="f">Columna descripción</label><select id="mapDesc"></select></div>
+      </div>
+      <div style="max-height:300px;overflow:auto"><table id="impPreview"></table></div>
+      <hr class="hr">
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <button class="btn" id="impConfirm">Importar movimientos</button>
+        <span class="mut" id="impStats"></span>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-2);margin-top:12px;cursor:pointer">
+        <input type="checkbox" id="impInvert" style="width:auto"> Invertir signo — marcalo si en la previsualización tus gastos aparecen como "ingreso"
+      </label>
+      <p class="mut" style="margin-top:10px">Los débitos se importan como gasto (tipo Boludez por defecto — después los reclasificás). Los créditos, como ingreso. Duplicados exactos se descartan.</p>
+    </div>
+  </div>
+
+  <h2 class="st">Historial importado</h2>
+  <div class="card" style="padding:8px 12px" id="impHist"></div>
+</section>
+
+<!-- ================= PLAN ================= -->
+<section class="view" id="v-plan">
+  <h1 class="vt">Plan & Simulador</h1>
+  <p class="vs">Tu meta de ahorro convertida en un límite diario concreto — y el mapa exacto de recortes si te desviás.</p>
+
+  <div class="grid g2">
+    <div class="card">
+      <h2 class="st" style="margin-top:0">Parámetros</h2>
+      <div class="frow">
+        <div>
+          <label class="f">Sueldo fijo mensual (ARS)</label>
+          <input type="number" id="cfgSueldo" inputmode="decimal" min="0" step="any">
+        </div>
+        <div>
+          <label class="f">Meta de ahorro mensual (USD)</label>
+          <input type="number" id="cfgMeta" inputmode="decimal" min="0" step="any">
+        </div>
+      </div>
+      <div class="frow">
+        <div>
+          <label class="f">Efectivo / cuentas hoy (ARS)</label>
+          <input type="number" id="cfgPatARS" inputmode="decimal" step="any">
+        </div>
+        <div>
+          <label class="f">Ahorros en USD</label>
+          <input type="number" id="cfgPatUSD" inputmode="decimal" step="any">
+        </div>
+      </div>
+      <div class="frow">
+        <div>
+          <label class="f">Días de laburo por mes (para proyectar propinas)</label>
+          <input type="number" id="cfgDias" inputmode="numeric" min="1" max="31" step="1">
+        </div>
+      </div>
+      <button class="btn wide" id="cfgSave">Guardar parámetros</button>
+    </div>
+
+    <div class="card">
+      <h2 class="st" style="margin-top:0">Motor de proyección · este mes</h2>
+      <table>
+        <tr><td>Ingreso proyectado</td><td class="r num" id="mIng">—</td></tr>
+        <tr><td style="padding-left:22px;color:var(--ink-2)">Sueldo fijo</td><td class="r num mut" id="mSueldo">—</td></tr>
+        <tr><td style="padding-left:22px;color:var(--ink-2)">Propinas proyectadas</td><td class="r num mut" id="mProp">—</td></tr>
+        <tr><td style="padding-left:22px;color:var(--ink-2)">Otros ingresos</td><td class="r num mut" id="mOtros">—</td></tr>
+        <tr><td>Gastos fijos proyectados</td><td class="r num" id="mFijos">—</td></tr>
+        <tr><td>Meta de ahorro</td><td class="r num" id="mMeta">—</td></tr>
+        <tr><td><b>Presupuesto de boludeces</b></td><td class="r num" id="mPres" style="font-weight:700">—</td></tr>
+        <tr><td style="padding-left:22px;color:var(--ink-2)">Ya gastado</td><td class="r num mut" id="mGastado">—</td></tr>
+        <tr><td><b>Límite diario restante</b></td><td class="r num" id="mLim" style="font-weight:700">—</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2 class="st">Simulador de recortes</h2>
+  <div class="card" id="simBox"></div>
+
+  <h2 class="st">Tus datos</h2>
+  <div class="card">
+    <p class="mut" style="margin-bottom:14px">Todo se guarda únicamente en este navegador, en este dispositivo. Nadie más lo ve. Descargá un backup cada tanto: si borrás los datos de navegación o cambiás de dispositivo, lo restaurás desde acá y no perdés el histórico.</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn ghost" id="bakExp">Descargar backup (.json)</button>
+      <button class="btn ghost" id="bakImp">Restaurar backup</button>
+      <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
+    </div>
+  </div>
+</section>
+
+</main>
+
+<nav class="tabs">
+  <button data-v="dash" class="active"><span class="ico">◈</span>Dashboard</button>
+  <button data-v="carga"><span class="ico">＋</span>Carga</button>
+  <button data-v="import"><span class="ico">⇣</span>Importar</button>
+  <button data-v="plan"><span class="ico">◎</span>Plan</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   ARQUITECTURA
+   Store    → única fuente de verdad, persistida en LocalStorage (schema versionado)
+   FX       → tipo de cambio (DolarAPI → cache → override manual)
+   Ledger   → operaciones sobre movimientos / propinas (con dedupe por hash)
+   Ingest   → parser CSV robusto + mapeo de columnas + normalización
+   Engine   → selectores derivados: proyecciones, presupuesto, límite diario
+   Auditor  → motor de reglas → alertas priorizadas
+   UI       → render puro a partir del Store (unidirectional data flow)
+   ============================================================ */
+
+/* ---------------- utils ---------------- */
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const monthKey = iso => iso.slice(0,7);
+const daysInMonth = (y,m) => new Date(y,m,0).getDate();
+const uid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const hashStr = s => { let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0; return (h>>>0).toString(36); };
+const fmtARS = n => '$ '+Math.round(n).toLocaleString('es-AR');
+const fmtUSD = n => 'US$ '+(Math.round(n*100)/100).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:2});
+const clamp = (n,a,b) => Math.min(b,Math.max(a,n));
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200); }
+
+const CATS = ['Comida & Super','Cenas & Salidas','Transporte','Salud & Terapia','Casa & Servicios','Ropa & Belleza','Suscripciones','Regalos','Viajes','Otros'];
+
+/* ---------------- Store ---------------- */
+const Store = (() => {
+  const KEY = 'finanzas_os_v1';
+  const defaults = () => ({
+    version: 1,
+    config: { sueldoFijo:0, metaAhorroUSD:200, patARS:0, patUSD:0, diasTrabajo:22 },
+    fx: { valor:null, fuente:null, ts:0, manual:false },
+    propinas: [],          // {id, fecha, monto}
+    movimientos: []        // {id, fecha, monto, categoria, tipo:'fijo'|'boludez'|'ingreso', desc, cuenta, origen, hash}
+  });
+  let state;
+  try { state = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY)||'{}')); }
+  catch(e){ state = defaults(); }
+  // merge profundo mínimo para config/fx
+  state.config = Object.assign(defaults().config, state.config||{});
+  state.fx = Object.assign(defaults().fx, state.fx||{});
+  const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ No se pudo guardar (storage lleno)'); } };
+  // reemplaza el estado in-place (los módulos guardan referencia a `state`)
+  function replace(next){
+    for (const k of Object.keys(state)) delete state[k];
+    Object.assign(state, defaults(), next);
+    state.config = Object.assign(defaults().config, next.config||{});
+    state.fx = Object.assign(defaults().fx, next.fx||{});
+    save();
+  }
+  return { get:()=>state, save, replace };
+})();
+
+/* ---------------- FX (Módulo 2: bimonetario) ---------------- */
+const FX = (() => {
+  const S = Store.get();
+  const STALE_MS = 1000*60*60*6; // 6 h
+  async function refresh(){
+    if (S.fx.manual) { render(); return; }
+    try {
+      const r = await fetch('https://dolarapi.com/v1/dolares/blue', {signal: AbortSignal.timeout(6000)});
+      const j = await r.json();
+      if (j && j.venta) { S.fx = {valor:+j.venta, fuente:'DolarAPI · blue venta', ts:Date.now(), manual:false}; Store.save(); }
+    } catch(e){ /* offline: usamos cache */ }
+    render(); UI.renderAll();
+  }
+  function setManual(){
+    const cur = S.fx.valor || 1000;
+    const v = prompt('Tipo de cambio ARS/USD (dejar vacío para volver a automático):', S.fx.manual? S.fx.valor : cur);
+    if (v === null) return;
+    if (v.trim() === '') { S.fx.manual=false; Store.save(); refresh(); return; }
+    const n = parseFloat(v.replace(',','.'));
+    if (n>0){ S.fx={valor:n,fuente:'Manual',ts:Date.now(),manual:true}; Store.save(); render(); UI.renderAll(); }
+  }
+  const rate = () => S.fx.valor || 0;
+  const usd = ars => S.fx.valor ? ars/S.fx.valor : 0;
+  function render(){
+    $('#fxVal').textContent = S.fx.valor ? '$'+Math.round(S.fx.valor).toLocaleString('es-AR') : '—';
+    const stale = !S.fx.valor || (!S.fx.manual && Date.now()-S.fx.ts > STALE_MS);
+    $('#fxDot').classList.toggle('stale', stale);
+    $('#fxPill').title = S.fx.fuente ? (S.fx.fuente + (S.fx.manual?'':' · '+new Date(S.fx.ts).toLocaleString('es-AR')) + ' — tocar para actualizar/fijar') : 'Sin cotización — tocar para fijar manual';
+  }
+  return { refresh, setManual, rate, usd, render };
+})();
+
+/* ---------------- Ledger ---------------- */
+const Ledger = (() => {
+  const S = Store.get();
+  function addMov(m){
+    m.id = uid();
+    m.hash = m.hash || hashStr([m.fecha,m.monto,m.desc||'',m.cuenta||''].join('|'));
+    S.movimientos.push(m); Store.save();
+  }
+  function delMov(id){ S.movimientos = S.movimientos.filter(m=>m.id!==id); Store.save(); }
+  function toggleTipo(id){
+    const m = S.movimientos.find(x=>x.id===id);
+    if (m && m.tipo!=='ingreso'){ m.tipo = m.tipo==='fijo'?'boludez':'fijo'; Store.save(); }
+  }
+  function addPropina(fecha, monto){
+    const ex = S.propinas.find(p=>p.fecha===fecha);
+    if (ex) ex.monto += monto; else S.propinas.push({id:uid(), fecha, monto});
+    Store.save();
+  }
+  function delPropina(id){ S.propinas = S.propinas.filter(p=>p.id!==id); Store.save(); }
+  const existsHash = h => S.movimientos.some(m=>m.hash===h);
+  return { addMov, delMov, toggleTipo, addPropina, delPropina, existsHash };
+})();
+
+/* ---------------- Ingest (Módulo 1: CSV) ---------------- */
+const Ingest = (() => {
+  let parsed = null; // {headers, rows}
+  function parseCSV(text){
+    // detectar delimitador por frecuencia en la 1ra línea no vacía
+    const firstLine = text.split(/\r?\n/).find(l=>l.trim()) || '';
+    const delim = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+    const rows = []; let row=[], cell='', inQ=false;
+    for (let i=0;i<text.length;i++){
+      const c=text[i];
+      if (inQ){
+        if (c==='"'){ if(text[i+1]==='"'){cell+='"';i++;} else inQ=false; }
+        else cell+=c;
+      } else {
+        if (c==='"') inQ=true;
+        else if (c===delim){ row.push(cell); cell=''; }
+        else if (c==='\n'||c==='\r'){ if(c==='\r'&&text[i+1]==='\n')i++; row.push(cell); if(row.some(x=>x.trim())) rows.push(row); row=[]; cell=''; }
+        else cell+=c;
+      }
+    }
+    if (cell || row.length){ row.push(cell); if(row.some(x=>x.trim())) rows.push(row); }
+    if (!rows.length) return null;
+    return { headers: rows[0].map(h=>h.trim()), rows: rows.slice(1) };
+  }
+  function guessCol(headers, keys){
+    const low = headers.map(h=>h.toLowerCase());
+    for (const k of keys){ const i = low.findIndex(h=>h.includes(k)); if(i>=0) return i; }
+    return 0;
+  }
+  function parseNum(s){
+    if (s==null) return NaN;
+    s = String(s).trim().replace(/[$\s]/g,'').replace(/ARS|USD/gi,'');
+    if (!s) return NaN;
+    // "1.234,56" → coma decimal · "1,234.56" → punto decimal
+    if (/,\d{1,2}$/.test(s)) s = s.replace(/\./g,'').replace(',','.');
+    else s = s.replace(/,/g,'');
+    return parseFloat(s);
+  }
+  function parseDate(s){
+    if (!s) return null;
+    s = String(s).trim();
+    let m;
+    if (m = s.match(/^(\d{4})-(\d{2})-(\d{2})/)) return m[1]+'-'+m[2]+'-'+m[3];
+    if (m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/)) return m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    if (m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2})$/)) return '20'+m[3]+'-'+m[2].padStart(2,'0')+'-'+m[1].padStart(2,'0');
+    return null;
+  }
+  function showMapping(){
+    if (!parsed || !parsed.rows.length){ toast('No encontré movimientos en el archivo'); return; }
+    const h = parsed.headers;
+    const fill = (sel, guess) => { sel.innerHTML = h.map((x,i)=>`<option value="${i}" ${i===guess?'selected':''}>${x||('Col '+(i+1))}</option>`).join(''); };
+    fill($('#mapFecha'), guessCol(h,['fecha','date','día','dia']));
+    fill($('#mapMonto'), guessCol(h,['importe','monto','amount','débito','debito','valor','total']));
+    fill($('#mapDesc'),  guessCol(h,['descrip','detalle','concepto','referencia','comercio','memo']));
+    $('#impPreviewBox').style.display='block';
+    renderPreview();
+  }
+  function handleFile(file){
+    if (/\.pdf$/i.test(file.name) || file.type==='application/pdf'){ handlePDF(file); return; }
+    const rd = new FileReader();
+    rd.onload = e => { parsed = parseCSV(e.target.result); showMapping(); };
+    rd.readAsText(file);
+  }
+
+  /* --- PDF: PDF.js (Mozilla) cargado bajo demanda; solo la 1ra vez necesita internet --- */
+  const PDFJS_BASE = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+  function loadPdfJs(){
+    if (window.pdfjsLib) return Promise.resolve();
+    return new Promise((res,rej)=>{
+      const s = document.createElement('script');
+      s.src = PDFJS_BASE+'pdf.min.js';
+      s.onload = ()=>{ window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_BASE+'pdf.worker.min.js'; res(); };
+      s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  async function handlePDF(file){
+    toast('Leyendo PDF…');
+    try { await loadPdfJs(); }
+    catch(e){ toast('Para leer PDF necesitás internet (descarga el lector una sola vez)'); return; }
+    try {
+      const buf = await file.arrayBuffer();
+      const doc = await window.pdfjsLib.getDocument({data:buf}).promise;
+      // reconstruir líneas: agrupar fragmentos de texto por coordenada Y, ordenar por X
+      const lines = [];
+      for (let p=1; p<=doc.numPages; p++){
+        const page = await doc.getPage(p);
+        const tc = await page.getTextContent();
+        const byY = {};
+        for (const it of tc.items){
+          if (!it.str || !it.str.trim()) continue;
+          const y = Math.round(it.transform[5]/3)*3;   // tolerancia vertical 3pt
+          (byY[y] = byY[y] || []).push({ x: it.transform[4], s: it.str });
+        }
+        Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>{
+          lines.push(byY[y].sort((a,b)=>a.x-b.x).map(i=>i.s).join(' ').replace(/\s+/g,' ').trim());
+        });
+      }
+      if (lines.join('').length < 60){
+        toast('Este PDF es una imagen escaneada, no tiene texto legible. Pedí el extracto en CSV/Excel al home banking.');
+        return;
+      }
+      // extraer movimientos: línea que arranca con fecha y contiene al menos un monto formato argentino
+      const DATE  = /^(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4})\s+(.*)$/;
+      const MONEY = /-?\$?\s?\d{1,3}(?:\.\d{3})*,\d{2}\s?-?/g;
+      const out = [];
+      for (const ln of lines){
+        const dm = ln.match(DATE);
+        if (!dm) continue;
+        const rest = dm[2];
+        const tokens = rest.match(MONEY);
+        if (!tokens || !tokens.length) continue;
+        // convención extracto: último número = saldo, anteúltimo = importe (si hay uno solo, es el importe)
+        const amtTok = tokens.length >= 2 ? tokens[tokens.length-2] : tokens[0];
+        const neg = amtTok.includes('-');
+        const desc = rest.slice(0, rest.indexOf(tokens[0])).trim();
+        out.push([ dm[1], desc || 'Movimiento', (neg?'-':'') + amtTok.replace(/[-$\s]/g,'') ]);
+      }
+      if (!out.length){
+        toast('No reconocí movimientos en este PDF. Probá exportarlo como CSV desde el home banking.');
+        return;
+      }
+      parsed = { headers:['Fecha','Descripción','Importe'], rows: out };
+      showMapping();
+      toast(`${out.length} movimientos detectados — revisá la previsualización`);
+    } catch(e){ toast('No pude leer este PDF'); }
+  }
+  function currentMapping(){
+    return { f:+$('#mapFecha').value, m:+$('#mapMonto').value, d:+$('#mapDesc').value };
+  }
+  function normalized(){
+    if (!parsed) return [];
+    const {f,m,d} = currentMapping();
+    const cuenta = $('#impCuenta').value;
+    const invertir = $('#impInvert').checked;
+    const out = [];
+    for (const r of parsed.rows){
+      const fecha = parseDate(r[f]); let monto = parseNum(r[m]);
+      if (!fecha || isNaN(monto) || monto===0) continue;
+      if (invertir) monto = -monto;
+      const desc = (r[d]||'').trim();
+      out.push({
+        fecha, cuenta, desc,
+        monto: Math.abs(monto),
+        tipo: monto < 0 ? 'boludez' : 'ingreso',  // débito → gasto, crédito → ingreso
+        categoria: 'Otros', origen: 'csv',
+        hash: hashStr(['csv',cuenta,fecha,monto,desc].join('|'))
+      });
+    }
+    return out;
+  }
+  function renderPreview(){
+    const items = normalized();
+    const dup = items.filter(i=>Ledger.existsHash(i.hash)).length;
+    $('#impStats').textContent = `${items.length} movimientos válidos · ${dup} duplicados serán descartados`;
+    const rows = items.slice(0,60).map(i=>`
+      <tr><td class="num">${i.fecha}</td>
+      <td>${i.desc||'<span class="mut">—</span>'}</td>
+      <td><span class="pill ${i.tipo}">${i.tipo==='ingreso'?'ingreso':'gasto'}</span></td>
+      <td class="r num">${fmtARS(i.monto)}</td></tr>`).join('');
+    $('#impPreview').innerHTML = `<tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th class="r">Monto</th></tr>${rows}`;
+  }
+  function confirm(){
+    const items = normalized();
+    let n=0;
+    for (const i of items){ if (!Ledger.existsHash(i.hash)){ Ledger.addMov(i); n++; } }
+    toast(`${n} movimientos importados`);
+    parsed=null; $('#impPreviewBox').style.display='none'; $('#fileIn').value='';
+    UI.renderAll();
+  }
+  return { handleFile, renderPreview, confirm };
+})();
+
+/* ---------------- Engine (Módulo 3: proyección) ---------------- */
+const Engine = (() => {
+  const S = Store.get();
+  function ctx(){
+    const now = new Date();
+    const y=now.getFullYear(), m=now.getMonth()+1;
+    const mk = String(y)+'-'+String(m).padStart(2,'0');
+    const dim = daysInMonth(y,m), day = now.getDate();
+    const diasRestantes = dim - day + 1; // incluye hoy
+    return { mk, dim, day, diasRestantes };
+  }
+  function propinasStats(){
+    const c = ctx();
+    const mes = S.propinas.filter(p=>monthKey(p.fecha)===c.mk);
+    // promedio sobre días con carga (no sobre días calendario): refleja tu ritmo real de laburo
+    const dias = new Set(mes.map(p=>p.fecha)).size;
+    const total = mes.reduce((a,p)=>a+p.monto,0);
+    const prom = dias ? total/dias : 0;
+    // proyección: lo ya cobrado + promedio × días de laburo que faltan del mes
+    const diasTrabajo = S.config.diasTrabajo || 22;
+    const proyeccion = dias ? total + prom * Math.max(0, diasTrabajo - dias) : 0;
+    return { total, prom, dias, diasTrabajo, proyeccion };
+  }
+  function mes(){
+    const c = ctx();
+    const movs = S.movimientos.filter(m=>monthKey(m.fecha)===c.mk);
+    const fijosGastado   = movs.filter(m=>m.tipo==='fijo').reduce((a,m)=>a+m.monto,0);
+    const boludGastado   = movs.filter(m=>m.tipo==='boludez').reduce((a,m)=>a+m.monto,0);
+    const otrosIngresos  = movs.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
+    const p = propinasStats();
+    const ingresoProy = S.config.sueldoFijo + p.proyeccion + otrosIngresos;
+    // fijos proyectados: lo gastado + run-rate del resto del mes (conservador: mismo ritmo)
+    const fijosProy = c.day>0 ? fijosGastado * (c.dim/c.day) : fijosGastado;
+    const metaARS = S.config.metaAhorroUSD * FX.rate();
+    const presupuestoBolud = ingresoProy - fijosProy - metaARS;
+    const restante = presupuestoBolud - boludGastado;
+    const limiteDiario = c.diasRestantes>0 ? restante / c.diasRestantes : 0;
+    const boludProy = c.day>0 ? boludGastado * (c.dim/c.day) : 0;
+    const ahorroProy = ingresoProy - fijosProy - boludProy;
+    const hoy = todayISO();
+    const gastadoHoy = movs.filter(m=>m.tipo==='boludez'&&m.fecha===hoy).reduce((a,m)=>a+m.monto,0);
+    return { ...c, movs, fijosGastado, boludGastado, otrosIngresos, propinas:p,
+             ingresoProy, fijosProy, metaARS, presupuestoBolud, restante,
+             limiteDiario, boludProy, ahorroProy, gastadoHoy };
+  }
+  function patrimonio(){
+    const rate = FX.rate();
+    const ars = S.config.patARS + S.config.patUSD * rate;
+    return { ars, usd: rate? ars/rate : 0 };
+  }
+  function categoriasBoludez(){
+    const c = ctx();
+    const map = {};
+    for (const m of S.movimientos){
+      if (m.tipo!=='boludez' || monthKey(m.fecha)!==c.mk) continue;
+      map[m.categoria] = (map[m.categoria]||0)+m.monto;
+    }
+    return Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  }
+  /* Simulador: cuánto recortar por categoría para cerrar el gap,
+     ponderado por peso de cada categoría (recorta más donde más se gasta) */
+  function simulador(){
+    const M = mes();
+    const gap = M.boludProy - M.presupuestoBolud;   // exceso proyectado
+    const cats = categoriasBoludez();
+    const totalBolud = cats.reduce((a,c)=>a+c[1],0);
+    if (gap<=0 || !totalBolud) return { gap, cats:[], factible:true };
+    // el recorte se aplica sobre lo que RESTA del mes (no se puede recortar el pasado)
+    const restanteProy = M.boludProy - M.boludGastado;
+    const factible = restanteProy >= gap;
+    const target = Math.min(gap, Math.max(0,restanteProy));
+    const items = cats.map(([cat,monto])=>{
+      const peso = monto/totalBolud;
+      const recorte = target * peso;
+      const proyCat = M.day>0 ? monto*(M.dim/M.day) : monto;
+      const restCat = proyCat - monto;
+      const pct = restCat>0 ? clamp(recorte/restCat,0,1) : 0;
+      return { cat, gastado:monto, recorte, pct };
+    }).filter(i=>i.recorte>=1);
+    return { gap, target, factible, cats:items };
+  }
+  return { ctx, mes, patrimonio, categoriasBoludez, simulador, propinasStats };
+})();
+
+/* ---------------- Auditor (Módulo 4: reglas) ---------------- */
+const Auditor = (() => {
+  function run(){
+    const M = Engine.mes();
+    const S = Store.get();
+    const A = [];
+    const rate = FX.rate();
+
+    if (!S.config.sueldoFijo && !S.propinas.length && !S.movimientos.length){
+      A.push({lvl:'ok', msg:`<b>Empezá por el Plan.</b> Cargá tu sueldo fijo y tu meta de ahorro, después importá tus CSV bancarios. En 10 minutos tenés el sistema operativo.`});
+      return A;
+    }
+    // 1 · ritmo global de boludeces vs presupuesto
+    if (M.presupuestoBolud > 0 && M.day >= 3){
+      const ritmo = M.boludProy / M.presupuestoBolud;
+      if (ritmo > 1.15) A.push({lvl:'crit', msg:`<b>A este ritmo no llegás.</b> Proyección de boludeces ${fmtARS(M.boludProy)} vs presupuesto ${fmtARS(M.presupuestoBolud)} (${Math.round((ritmo-1)*100)}% arriba). Mirá el Simulador de Recortes.`});
+      else if (ritmo > 0.95) A.push({lvl:'warn', msg:`<b>Al límite.</b> Vas a consumir ~${Math.round(ritmo*100)}% del presupuesto de boludeces. Un desliz y no hay ahorro este mes.`});
+      else A.push({lvl:'ok', msg:`<b>En rumbo.</b> Ritmo de boludeces al ${Math.round(ritmo*100)}% del presupuesto. Ahorro proyectado: ${fmtARS(M.ahorroProy)}${rate?` (${fmtUSD(M.ahorroProy/rate)})`:''}.`});
+    }
+    // 2 · presupuesto negativo: la meta no cierra ni con cero boludeces
+    if (M.presupuestoBolud < 0)
+      A.push({lvl:'crit', msg:`<b>La meta no cierra.</b> Ingresos − fijos − meta da ${fmtARS(M.presupuestoBolud)}. O bajás la meta, o bajás fijos, o subís ingresos: no hay presupuesto de boludeces posible.`});
+    // 3 · categoría dominante acelerando
+    const cats = Engine.categoriasBoludez();
+    if (cats.length && M.day>=5 && M.presupuestoBolud>0){
+      const [cat, monto] = cats[0];
+      const proyCat = monto*(M.dim/M.day);
+      if (proyCat > M.presupuestoBolud*0.4)
+        A.push({lvl:'warn', msg:`<b>Estás gastando de más en ${cat}.</b> ${fmtARS(monto)} en ${M.day} días → proyecta ${fmtARS(proyCat)}, ${Math.round(proyCat/M.presupuestoBolud*100)}% de todo tu presupuesto de boludeces.`});
+    }
+    // 4 · límite diario de hoy
+    if (M.limiteDiario>0 && M.gastadoHoy > M.limiteDiario)
+      A.push({lvl:'warn', msg:`<b>Hoy ya te pasaste.</b> Gastaste ${fmtARS(M.gastadoHoy)} en boludeces; el límite diario es ${fmtARS(M.limiteDiario)}. Mañana el límite baja.`});
+    // 5 · propinas cayendo (últimos 7 días vs promedio del mes)
+    const P = Engine.propinasStats();
+    if (P.dias >= 7){
+      const hoy = new Date(); const hace7 = new Date(hoy); hace7.setDate(hoy.getDate()-7);
+      const iso7 = hace7.toISOString().slice(0,10);
+      const ult = Store.get().propinas.filter(p=>p.fecha>=iso7);
+      const dias7 = new Set(ult.map(p=>p.fecha)).size;
+      if (dias7>=3){
+        const prom7 = ult.reduce((a,p)=>a+p.monto,0)/dias7;
+        if (prom7 < P.prom*0.75)
+          A.push({lvl:'warn', msg:`<b>Propinas en baja.</b> Promedio de la última semana ${fmtARS(prom7)}/día vs ${fmtARS(P.prom)}/día del mes (−${Math.round((1-prom7/P.prom)*100)}%). La proyección de ingresos ya lo refleja.`});
+      }
+    }
+    // 6 · sin cotización
+    if (!rate) A.push({lvl:'warn', msg:`<b>Sin tipo de cambio.</b> No pude traer DolarAPI y no hay valor manual. Tocá la píldora "USD blue" arriba para fijarlo — sin eso, la meta en USD no se puede convertir.`});
+    return A;
+  }
+  return { run };
+})();
+
+/* ---------------- UI ---------------- */
+const UI = (() => {
+  const S = Store.get();
+  let gTipo = 'boludez';
+
+  function duo(ars){ const r=FX.rate(); return r? `${fmtARS(ars)} <span class="duo num">· ${fmtUSD(ars/r)}</span>` : fmtARS(ars); }
+
+  function renderDash(){
+    const M = Engine.mes();
+    const P = Engine.patrimonio();
+    const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    $('#dashSub').textContent = `${meses[new Date().getMonth()]} · día ${M.day} de ${M.dim} · quedan ${M.diasRestantes} días`;
+
+    $('#kPatARS').textContent = fmtARS(P.ars);
+    $('#kPatUSD').textContent = FX.rate()? fmtUSD(P.usd) : 'fijá el tipo de cambio';
+
+    const meta = M.metaARS;
+    $('#kAhorro').innerHTML = fmtARS(M.ahorroProy);
+    $('#kAhorro').className = 'val num ' + (meta>0 ? (M.ahorroProy>=meta?'ok':(M.ahorroProy<0?'bad':'')) : '');
+    $('#kAhorroSub').textContent = meta>0 ? `proyectado vs meta ${fmtUSD(S.config.metaAhorroUSD)} (${fmtARS(meta)})` : 'definí una meta en Plan';
+    const pct = meta>0 ? clamp(M.ahorroProy/meta*100,0,130) : 0;
+    $('#kAhorroBar').style.width = clamp(pct,0,100)+'%';
+    $('#kAhorroBar').className = M.ahorroProy < meta*0.8 && meta>0 ? 'over':'';
+
+    $('#kLimite').innerHTML = fmtARS(Math.max(0,M.limiteDiario));
+    $('#kLimite').className = 'val num ' + (M.limiteDiario<=0 && M.presupuestoBolud!==0 ?'bad':'');
+    $('#kLimiteSub').textContent = M.presupuestoBolud>0
+      ? `${fmtARS(Math.max(0,M.restante))} restantes ÷ ${M.diasRestantes} días`
+      : 'sin presupuesto disponible';
+
+    $('#kHoy').innerHTML = fmtARS(M.gastadoHoy);
+    $('#kHoy').className = 'val num ' + (M.limiteDiario>0 && M.gastadoHoy>M.limiteDiario ? 'bad' : (M.gastadoHoy<=M.limiteDiario && M.limiteDiario>0 ? 'ok':''));
+    $('#kHoySub').textContent = M.limiteDiario>0 ? `de ${fmtARS(M.limiteDiario)} permitidos` : '—';
+
+    // alertas
+    $('#alertBox').innerHTML = Auditor.run().map(a=>{
+      const t = a.lvl==='crit'?'Alerta':a.lvl==='warn'?'Ojo':'OK';
+      return `<div class="alert ${a.lvl}"><span class="tag">${t}</span><div>${a.msg}</div></div>`;
+    }).join('');
+
+    renderChart();
+    renderMovList($('#lastMoves'), S.movimientos.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,8), false);
+  }
+
+  /* Gráfico SVG: barras apiladas por semana (fijos abajo, boludeces arriba),
+     ventana rodante de 8 semanas — cruza meses, así los importes históricos se ven */
+  function renderChart(){
+    const today = new Date(); today.setHours(0,0,0,0);
+    const iso = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    const weeks = [];
+    for (let w=7; w>=0; w--){
+      const end = new Date(today); end.setDate(end.getDate()-7*w);
+      const start = new Date(end); start.setDate(start.getDate()-6);
+      weeks.push({s:iso(start), e:iso(end), lbl:start.getDate()+'/'+(start.getMonth()+1), fijo:0, bol:0});
+    }
+    for (const m of S.movimientos){
+      if (m.tipo==='ingreso') continue;
+      const wk = weeks.find(w=>m.fecha>=w.s && m.fecha<=w.e);
+      if (wk) wk[m.tipo==='fijo'?'fijo':'bol'] += m.monto;
+    }
+    const data = weeks;
+    const max = Math.max(1,...data.map(d=>d.fijo+d.bol));
+    const W=640,H=200,pad=36,bw=Math.min(64,(W-pad*2)/data.length*0.55);
+    const x=i=>pad+(W-pad*2)*(i+0.5)/data.length;
+    const y=v=>H-28-(H-56)*(v/max);
+    let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:420px;display:block">`;
+    // gridlines
+    for (let g=0; g<=3; g++){
+      const v = max*g/3, yy=y(v);
+      s+=`<line x1="${pad}" x2="${W-pad}" y1="${yy}" y2="${yy}" stroke="#EDECE7" stroke-width="1"/>`;
+      s+=`<text x="${pad-6}" y="${yy+4}" text-anchor="end" font-size="10" fill="#A3A29B" class="num">${v>=1000?Math.round(v/1000)+'k':Math.round(v)}</text>`;
+    }
+    data.forEach((d,i)=>{
+      const xf=x(i)-bw/2;
+      const yF=y(d.fijo), yB=y(d.fijo+d.bol);
+      s+=`<rect x="${xf}" y="${yF}" width="${bw}" height="${(H-28)-yF}" rx="4" fill="#2E5641"/>`;
+      if (d.bol>0) s+=`<rect x="${xf}" y="${yB}" width="${bw}" height="${yF-yB}" rx="4" fill="#C86A5C"/>`;
+      s+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#6B6A65">${d.lbl}</text>`;
+      const tot=d.fijo+d.bol;
+      if (tot>0) s+=`<text x="${x(i)}" y="${yB-6}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#151513" class="num">${tot>=1000?Math.round(tot/1000)+'k':Math.round(tot)}</text>`;
+    });
+    // leyenda
+    s+=`<circle cx="${W-150}" cy="14" r="4" fill="#2E5641"/><text x="${W-142}" y="18" font-size="11" fill="#6B6A65">Fijos</text>`;
+    s+=`<circle cx="${W-90}" cy="14" r="4" fill="#C86A5C"/><text x="${W-82}" y="18" font-size="11" fill="#6B6A65">Boludeces</text>`;
+    s+='</svg>';
+    $('#chart').innerHTML = s;
+  }
+
+  function renderMovList(el, movs, editable){
+    if (!movs.length){ el.innerHTML = '<div class="empty">Sin movimientos todavía.</div>'; return; }
+    const r = FX.rate();
+    el.innerHTML = `<table>
+      <tr><th>Fecha</th><th>Detalle</th><th>Tipo</th><th class="r">ARS</th>${r?'<th class="r">USD</th>':''}${editable?'<th></th>':''}</tr>
+      ${movs.map(m=>`<tr>
+        <td class="num" style="white-space:nowrap">${m.fecha.slice(5)}</td>
+        <td>${m.desc||m.categoria}${m.cuenta?` <span class="mut">· ${m.cuenta}</span>`:''}</td>
+        <td><span class="pill ${m.tipo}" ${m.tipo!=='ingreso'?`style="cursor:pointer;white-space:nowrap" title="Tocar para cambiar fijo↔boludez" onclick="UI.flip('${m.id}')"`:''}>${m.tipo}${m.tipo!=='ingreso'?' ⇄':''}</span></td>
+        <td class="r num">${m.tipo==='ingreso'?'+':''}${fmtARS(m.monto)}</td>
+        ${r?`<td class="r num duo">${fmtUSD(m.monto/r)}</td>`:''}
+        ${editable?`<td class="r"><button class="del" onclick="UI.rm('${m.id}')">×</button></td>`:''}
+      </tr>`).join('')}
+    </table>`;
+  }
+
+  let movMonth = null;
+  function renderCarga(){
+    $('#gCat').innerHTML = CATS.map(c=>`<option>${c}</option>`).join('');
+    if(!$('#gFecha').value) $('#gFecha').value = todayISO();
+    if(!$('#pFecha').value) $('#pFecha').value = todayISO();
+    const P = Engine.propinasStats();
+    $('#pProm').innerHTML = P.dias? duo(P.prom)+`<span class="mut" style="font-size:12px"> · ${P.dias} días</span>` : '—';
+    $('#pProy').innerHTML = P.dias? duo(P.proyeccion) : '—';
+    // selector de mes: todos los meses con datos + el actual
+    const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const lblMes = mk => MESES[+mk.slice(5,7)-1]+' '+mk.slice(0,4);
+    const months = [...new Set(S.movimientos.map(m=>monthKey(m.fecha)))];
+    const cur = Engine.ctx().mk;
+    if (!months.includes(cur)) months.push(cur);
+    months.sort().reverse();
+    if (!movMonth || !months.includes(movMonth)) movMonth = cur;
+    $('#movMes').innerHTML = months.map(mk=>`<option value="${mk}" ${mk===movMonth?'selected':''}>${lblMes(mk)}</option>`).join('');
+    const movs = S.movimientos.filter(m=>monthKey(m.fecha)===movMonth).sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    renderMovList($('#movTable'), movs, true);
+  }
+
+  function renderImport(){
+    const csv = S.movimientos.filter(m=>m.origen==='csv');
+    if (!csv.length){ $('#impHist').innerHTML='<div class="empty">Todavía no importaste ningún extracto.</div>'; return; }
+    const byC = {};
+    for (const m of csv){ (byC[m.cuenta]=byC[m.cuenta]||{n:0,min:m.fecha,max:m.fecha}); byC[m.cuenta].n++; if(m.fecha<byC[m.cuenta].min)byC[m.cuenta].min=m.fecha; if(m.fecha>byC[m.cuenta].max)byC[m.cuenta].max=m.fecha; }
+    $('#impHist').innerHTML = `<table><tr><th>Cuenta</th><th class="r">Movimientos</th><th class="r">Rango</th></tr>
+      ${Object.entries(byC).map(([c,v])=>`<tr><td>${c}</td><td class="r num">${v.n}</td><td class="r num">${v.min} → ${v.max}</td></tr>`).join('')}</table>`;
+  }
+
+  function renderPlan(){
+    $('#cfgSueldo').value = S.config.sueldoFijo||'';
+    $('#cfgMeta').value = S.config.metaAhorroUSD||'';
+    $('#cfgPatARS').value = S.config.patARS||'';
+    $('#cfgPatUSD').value = S.config.patUSD||'';
+    $('#cfgDias').value = S.config.diasTrabajo||22;
+    const M = Engine.mes();
+    $('#mIng').innerHTML = duo(M.ingresoProy);
+    $('#mSueldo').textContent = fmtARS(S.config.sueldoFijo);
+    $('#mProp').textContent = fmtARS(M.propinas.proyeccion);
+    $('#mOtros').textContent = fmtARS(M.otrosIngresos);
+    $('#mFijos').innerHTML = '− '+duo(M.fijosProy);
+    $('#mMeta').innerHTML = '− '+duo(M.metaARS);
+    $('#mPres').innerHTML = duo(M.presupuestoBolud);
+    $('#mGastado').textContent = '− '+fmtARS(M.boludGastado);
+    $('#mLim').innerHTML = duo(Math.max(0,M.limiteDiario))+`<span class="mut"> /día</span>`;
+
+    const sim = Engine.simulador();
+    if (sim.gap<=0){
+      $('#simBox').innerHTML = `<div class="alert ok" style="margin:0"><span class="tag">OK</span><div><b>No hace falta recortar.</b> La proyección de boludeces entra en el presupuesto. Si querés ahorrar más, subí la meta en los parámetros.</div></div>`;
+    } else if (!sim.cats.length){
+      $('#simBox').innerHTML = `<div class="alert warn" style="margin:0"><span class="tag">Ojo</span><div><b>Hay un exceso proyectado de ${fmtARS(sim.gap)}</b> pero no hay categorías de boludeces cargadas para recortar. Revisá si tus gastos están bien clasificados.</div></div>`;
+    } else {
+      const head = sim.factible
+        ? `<div class="alert warn" style="margin-bottom:16px"><span class="tag">Plan</span><div><b>Tenés que recortar ${fmtARS(sim.target)}</b> en lo que queda del mes para llegar a la meta. Así se reparte:</div></div>`
+        : `<div class="alert crit" style="margin-bottom:16px"><span class="tag">Alerta</span><div><b>Ni recortando el 100% de las boludeces restantes llegás</b> (faltan ${fmtARS(sim.gap)}). La meta de este mes requiere tocar gastos fijos o sumar ingresos.</div></div>`;
+      $('#simBox').innerHTML = head + sim.cats.map(c=>`
+        <div class="cut-row">
+          <div class="cat">${c.cat}<small>llevás ${fmtARS(c.gastado)} este mes</small></div>
+          <div class="amt num">recortar ${fmtARS(c.recorte)}</div>
+          <div class="pct num">−${Math.round(c.pct*100)}%</div>
+        </div>`).join('');
+    }
+  }
+
+  function renderAll(){ renderDash(); renderCarga(); renderImport(); renderPlan(); }
+
+  /* ------- eventos ------- */
+  function bind(){
+    // nav
+    $$('nav.tabs button').forEach(b=>b.onclick=()=>{
+      $$('nav.tabs button').forEach(x=>x.classList.remove('active'));
+      $$('section.view').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      $('#v-'+b.dataset.v).classList.add('active');
+      renderAll();
+      window.scrollTo({top:0});
+    });
+    // fx
+    $('#fxPill').onclick = ()=>FX.setManual();
+    // selector de mes del historial
+    $('#movMes').onchange = e=>{ movMonth = e.target.value; renderCarga(); };
+    // segmentado
+    $$('#gTipo button').forEach(b=>b.onclick=()=>{
+      $$('#gTipo button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on'); gTipo=b.dataset.t;
+    });
+    // gasto
+    $('#gAdd').onclick = ()=>{
+      const monto = parseFloat($('#gMonto').value);
+      if (!(monto>0)) return toast('Poné un monto');
+      Ledger.addMov({ fecha:$('#gFecha').value||todayISO(), monto, categoria:$('#gCat').value, tipo:gTipo, desc:$('#gDesc').value.trim(), origen:'manual' });
+      $('#gMonto').value=''; $('#gDesc').value='';
+      toast('Gasto registrado'); renderAll(); $('#gMonto').focus();
+    };
+    // propina
+    $('#pAdd').onclick = ()=>{
+      const monto = parseFloat($('#pMonto').value);
+      if (!(monto>0)) return toast('Poné un monto');
+      Ledger.addPropina($('#pFecha').value||todayISO(), monto);
+      $('#pMonto').value='';
+      toast('Propinas registradas'); renderAll();
+    };
+    // otro ingreso
+    $('#iAdd').onclick = ()=>{
+      const monto = parseFloat($('#iMonto').value);
+      if (!(monto>0)) return toast('Poné un monto');
+      Ledger.addMov({ fecha:todayISO(), monto, categoria:'Otros', tipo:'ingreso', desc:$('#iDesc').value.trim()||'Ingreso', origen:'manual' });
+      $('#iMonto').value=''; $('#iDesc').value='';
+      toast('Ingreso registrado'); renderAll();
+    };
+    // config
+    $('#cfgSave').onclick = ()=>{
+      S.config.sueldoFijo = parseFloat($('#cfgSueldo').value)||0;
+      S.config.metaAhorroUSD = parseFloat($('#cfgMeta').value)||0;
+      S.config.patARS = parseFloat($('#cfgPatARS').value)||0;
+      S.config.patUSD = parseFloat($('#cfgPatUSD').value)||0;
+      S.config.diasTrabajo = clamp(parseFloat($('#cfgDias').value)||22,1,31);
+      Store.save(); toast('Parámetros guardados'); renderAll();
+    };
+    // import
+    const drop = $('#drop'), fi = $('#fileIn');
+    drop.onclick = ()=>fi.click();
+    fi.onchange = ()=>{ if(fi.files[0]) Ingest.handleFile(fi.files[0]); };
+    ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+    ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+    drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) Ingest.handleFile(f); });
+    ['mapFecha','mapMonto','mapDesc','impCuenta','impInvert'].forEach(id=>$('#'+id).onchange=()=>Ingest.renderPreview());
+    $('#impConfirm').onclick = ()=>Ingest.confirm();
+    // backup / restore
+    $('#bakExp').onclick = ()=>{
+      const data = JSON.stringify(Store.get(), null, 2);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([data],{type:'application/json'}));
+      a.download = 'finanzas-os-backup-'+todayISO()+'.json';
+      a.click(); URL.revokeObjectURL(a.href);
+      toast('Backup descargado');
+    };
+    $('#bakImp').onclick = ()=>$('#bakFile').click();
+    $('#bakFile').onchange = e=>{
+      const f = e.target.files[0]; if(!f) return;
+      const rd = new FileReader();
+      rd.onload = ev=>{
+        try {
+          const j = JSON.parse(ev.target.result);
+          if (!j || !Array.isArray(j.movimientos) || !Array.isArray(j.propinas)) throw 0;
+          const n = j.movimientos.length + j.propinas.length;
+          if (!window.confirm(`Restaurar backup con ${n} registros REEMPLAZA todos los datos actuales de este navegador. ¿Continuar?`)) return;
+          Store.replace(j);
+          toast('Backup restaurado'); renderAll(); FX.render();
+        } catch(err){ toast('El archivo no es un backup válido'); }
+        finally { $('#bakFile').value=''; }
+      };
+      rd.readAsText(f);
+    };
+    // enter-para-cargar
+    $('#gMonto').addEventListener('keydown',e=>{if(e.key==='Enter')$('#gAdd').click();});
+    $('#pMonto').addEventListener('keydown',e=>{if(e.key==='Enter')$('#pAdd').click();});
+  }
+
+  return {
+    renderAll, bind,
+    rm(id){ Ledger.delMov(id); renderAll(); },
+    flip(id){ Ledger.toggleTipo(id); renderAll(); }
+  };
+})();
+
+/* ---------------- boot ---------------- */
+UI.bind();
+FX.render();
+UI.renderAll();
+FX.refresh();
+// refresco de cotización cada 30 min mientras esté abierto
+setInterval(()=>FX.refresh(), 30*60*1000);
+</script>
+</body>
+</html>
