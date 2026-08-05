@@ -529,11 +529,17 @@ nav.tabs button{min-height:48px}
     </div>
     <hr class="hr">
     <h2 class="st" style="margin-top:0">Sincronización PC ↔ celular</h2>
-    <p class="mut" style="margin-bottom:12px">Usa un <b>Gist privado de tu GitHub</b> como nube personal (gratis, solo tuyo). Creá un token clásico con el permiso <b>gist</b> únicamente en <b>github.com/settings/tokens</b>, pegalo acá en cada dispositivo, y los datos se sincronizan solos después de cada carga. Paula puede hacer lo mismo con su propia cuenta — datos totalmente separados. El token queda guardado solo en este dispositivo y nunca se sube a ningún lado.</p>
-    <div class="frow"><div>
-      <label class="f">Token de GitHub (solo permiso "gist")</label>
-      <input type="password" id="syncToken" placeholder="ghp_…" autocomplete="off">
-    </div></div>
+    <p class="mut" style="margin-bottom:12px">Usa un <b>Gist privado de GitHub</b> como nube personal (gratis). Creá un token clásico con el permiso <b>gist</b> únicamente en <b>github.com/settings/tokens</b> y pegalo en cada dispositivo. El <b>perfil</b> separa nubes distintas dentro de una misma cuenta: cada perfil es un archivo aparte — mismo token, datos 100% separados. El token queda guardado solo en este dispositivo y nunca se sube a ningún lado.</p>
+    <div class="frow">
+      <div>
+        <label class="f">Token de GitHub (solo permiso "gist")</label>
+        <input type="password" id="syncToken" placeholder="ghp_…" autocomplete="off">
+      </div>
+      <div>
+        <label class="f">Perfil</label>
+        <input type="text" id="syncProfile" placeholder="ej: tomas o paula" autocomplete="off">
+      </div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <button class="btn" id="syncConnect">Conectar</button>
       <button class="btn ghost sm" id="syncBtnNow">Sincronizar ahora</button>
@@ -595,7 +601,7 @@ const Store = (() => {
     movimientos: [],       // {id, fecha, monto, categoria, tipo, desc, cuenta, origen, hash, mt}
     metas: [],             // {id, nombre, montoUSD, ts}
     deleted: [],           // tombstones: ids borrados (para que el sync no los resucite)
-    sync: { token:null, gistId:null, last:0 }
+    sync: { token:null, gistId:null, last:0, profile:null }
   });
   let state;
   try { state = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY)||'{}')); }
@@ -996,7 +1002,8 @@ const Auditor = (() => {
    El token vive SOLO en el localStorage de cada dispositivo; nunca viaja al gist. */
 const Sync = (() => {
   const S = Store.get();
-  const FILE = 'finanzas-os-sync.json';
+  // cada perfil = un archivo distinto en el gist → nubes separadas con una misma cuenta
+  const FILE = () => 'finanzas-os-sync'+(S.sync.profile ? '-'+S.sync.profile : '')+'.json';
   let timer=null, applying=false, busy=false;
   const st = m => { const el=$('#syncStatus'); if (el) el.textContent=m; };
   async function gh(path, opts={}){
@@ -1028,14 +1035,17 @@ const Sync = (() => {
     return { version:1, config:newer.config, configTs:newer.configTs||0, fx:fxN,
              propinas, movimientos, metas, deleted:[...del].slice(-2000) };
   }
-  async function connect(token){
-    S.sync.token = token; st('Conectando…');
+  async function connect(token, profile){
+    S.sync.token = token;
+    S.sync.profile = (profile||'').toLowerCase().replace(/[^a-z0-9]/g,'') || null;
+    st('Conectando…');
     const list = await (await gh('gists?per_page=100')).json();
-    const found = Array.isArray(list) && list.find(g=>g.files && g.files[FILE]);
+    const found = Array.isArray(list) && list.find(g=>g.files && g.files[FILE()]);
     if (found) S.sync.gistId = found.id;
     else {
       const c = await gh('gists', {method:'POST', body: JSON.stringify(
-        {description:'Finanzas OS — sync', public:false, files:{[FILE]:{content: JSON.stringify(exportable())}}})});
+        {description:'Finanzas OS — sync'+(S.sync.profile?' ('+S.sync.profile+')':''), public:false,
+         files:{[FILE()]:{content: JSON.stringify(exportable())}}})});
       S.sync.gistId = (await c.json()).id;
     }
     applying=true; Store.save(); applying=false;
@@ -1045,7 +1055,7 @@ const Sync = (() => {
     const r = await gh('gists/'+S.sync.gistId);
     if (r.status===404) return null;
     const j = await r.json();
-    const f = j.files && j.files[FILE];
+    const f = j.files && j.files[FILE()];
     if (!f) return null;
     let content = f.content;
     if (f.truncated) content = await (await fetch(f.raw_url)).text();
@@ -1053,7 +1063,7 @@ const Sync = (() => {
   }
   async function push(){
     await gh('gists/'+S.sync.gistId, {method:'PATCH', body: JSON.stringify(
-      {files:{[FILE]:{content: JSON.stringify(exportable())}}})});
+      {files:{[FILE()]:{content: JSON.stringify(exportable())}}})});
   }
   async function syncNow(silent){
     if (!S.sync.token || !S.sync.gistId || busy) return;
@@ -1081,7 +1091,7 @@ const Sync = (() => {
     if (applying || !S.sync.token || !S.sync.gistId) return;
     clearTimeout(timer); timer = setTimeout(()=>syncNow(true), 4000);
   }
-  function disconnect(){ S.sync.token=null; S.sync.gistId=null; S.sync.last=0; applying=true; Store.save(); applying=false; st('Desconectado'); }
+  function disconnect(){ S.sync.token=null; S.sync.gistId=null; S.sync.last=0; S.sync.profile=null; applying=true; Store.save(); applying=false; st('Desconectado'); }
   return { connect, syncNow, schedule, disconnect };
 })();
 Store.onSave(()=>Sync.schedule());
@@ -1279,8 +1289,9 @@ const UI = (() => {
       : '<div class="empty">Agregá tu primera meta — ej: "Mudarme", US$ 3.000.</div>';
 
     // ------- estado de sincronización -------
+    if (S.sync.profile && !$('#syncProfile').value) $('#syncProfile').value = S.sync.profile;
     $('#syncStatus').textContent = S.sync.token
-      ? ('Conectado'+(S.sync.last?' · última sync '+new Date(S.sync.last).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''))
+      ? ('Conectado'+(S.sync.profile?' · perfil "'+S.sync.profile+'"':'')+(S.sync.last?' · última sync '+new Date(S.sync.last).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''))
       : 'No conectado';
   }
 
@@ -1415,7 +1426,7 @@ const UI = (() => {
       const tok = $('#syncToken').value.trim();
       if (!tok) return toast('Pegá el token primero');
       $('#syncToken').value='';
-      Sync.connect(tok).catch(e=>{ toast('No pude conectar: '+(e.message||'')); $('#syncStatus').textContent='⚠ '+(e.message||'error'); });
+      Sync.connect(tok, $('#syncProfile').value).catch(e=>{ toast('No pude conectar: '+(e.message||'')); $('#syncStatus').textContent='⚠ '+(e.message||'error'); });
     };
     $('#syncBtnNow').onclick = ()=>Sync.syncNow(false);
     $('#syncOff').onclick = ()=>{ Sync.disconnect(); renderAll(); };
