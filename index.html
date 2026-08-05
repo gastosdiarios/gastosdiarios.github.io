@@ -170,7 +170,7 @@ th{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
 tr:last-child td{border-bottom:0}
 td.r,th.r{text-align:right}
-.pill{font-size:11px;font-weight:700;padding:2.5px 8px;border-radius:6px;display:inline-block}
+.pill{font-size:11px;font-weight:700;padding:2.5px 8px;border-radius:6px;display:inline-block;text-transform:capitalize}
 .pill.fijo{background:var(--accent-soft);color:var(--accent)}
 .pill.boludez{background:var(--danger-soft);color:var(--danger)}
 .pill.ingreso{background:#E8EDF5;color:#2C4A73}
@@ -277,6 +277,40 @@ nav.tabs button{min-height:48px}
   <h2 class="st">Últimos movimientos</h2>
   <p class="mut" style="margin:-6px 0 10px">Tocá la etiqueta de tipo para reclasificar: <span class="pill fijo">fijo ⇄</span> <span class="pill boludez">boludez ⇄</span></p>
   <div class="card" style="padding:8px 12px" id="lastMoves"></div>
+</section>
+
+<!-- ================= ANALISIS ================= -->
+<section class="view" id="v-analisis">
+  <h1 class="vt">Análisis de gastos</h1>
+  <p class="vs">Todos tus gastos, por categoría, en el período que elijas.</p>
+  <div class="card" style="margin-bottom:14px">
+    <div class="frow" style="margin-bottom:0;flex-wrap:wrap">
+      <div><label class="f">Período</label>
+        <select id="anPreset">
+          <option value="mes-act">Este mes</option>
+          <option value="mes-ant">Mes anterior</option>
+          <option value="7">Últimos 7 días</option>
+          <option value="15">Últimos 15 días (quincena)</option>
+          <option value="30">Últimos 30 días</option>
+          <option value="anio">Este año</option>
+          <option value="mes">Elegir mes…</option>
+          <option value="custom">Rango de fechas…</option>
+        </select>
+      </div>
+      <div id="anMesBox" style="display:none"><label class="f">Mes</label><select id="anMes"></select></div>
+      <div id="anDesdeBox" style="display:none"><label class="f">Desde</label><input type="date" id="anDesde"></div>
+      <div id="anHastaBox" style="display:none"><label class="f">Hasta</label><input type="date" id="anHasta"></div>
+    </div>
+  </div>
+  <div class="grid g4">
+    <div class="card kpi"><div class="lbl">Total gastado</div><div class="val num" id="anTotal">—</div><div class="sub duo num" id="anTotalUSD"></div></div>
+    <div class="card kpi"><div class="lbl">Fijos</div><div class="val num" id="anFijos">—</div><div class="sub num" id="anFijosPct"></div></div>
+    <div class="card kpi"><div class="lbl">Boludeces</div><div class="val num" id="anBol">—</div><div class="sub num" id="anBolPct"></div></div>
+    <div class="card kpi"><div class="lbl">Promedio diario</div><div class="val num" id="anProm">—</div><div class="sub num" id="anDias"></div></div>
+  </div>
+  <h2 class="st">Por categoría</h2>
+  <div class="card" id="anCats"></div>
+  <p class="mut" style="margin-top:12px" id="anIng"></p>
 </section>
 
 <!-- ================= CARGA ================= -->
@@ -471,6 +505,20 @@ nav.tabs button{min-height:48px}
   <h2 class="st">Simulador de recortes</h2>
   <div class="card" id="simBox"></div>
 
+  <h2 class="st">Metas de largo plazo</h2>
+  <div class="card">
+    <div class="frow">
+      <div><label class="f">Nombre de la meta</label><input id="metaNombre" placeholder="Mudarme, viaje, fondo de emergencia…"></div>
+      <div><label class="f">Monto necesario (USD)</label><input type="number" id="metaMonto" inputmode="decimal" min="1" step="any"></div>
+    </div>
+    <button class="btn ghost wide" id="metaAdd">Agregar meta</button>
+    <hr class="hr">
+    <label class="f">Escenario: ¿y si recortás las boludeces un <b id="wifLbl">0%</b>?</label>
+    <input type="range" id="wifPct" min="0" max="100" value="0" step="5" style="padding:0;margin:6px 0 8px">
+    <p class="mut" id="wifCap" style="margin-bottom:14px"></p>
+    <div id="metasList"></div>
+  </div>
+
   <h2 class="st">Tus datos</h2>
   <div class="card">
     <p class="mut" style="margin-bottom:14px">Todo se guarda únicamente en este navegador, en este dispositivo. Nadie más lo ve. Descargá un backup cada tanto: si borrás los datos de navegación o cambiás de dispositivo, lo restaurás desde acá y no perdés el histórico.</p>
@@ -479,6 +527,19 @@ nav.tabs button{min-height:48px}
       <button class="btn ghost" id="bakImp">Restaurar backup</button>
       <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
     </div>
+    <hr class="hr">
+    <h2 class="st" style="margin-top:0">Sincronización PC ↔ celular</h2>
+    <p class="mut" style="margin-bottom:12px">Usa un <b>Gist privado de tu GitHub</b> como nube personal (gratis, solo tuyo). Creá un token clásico con el permiso <b>gist</b> únicamente en <b>github.com/settings/tokens</b>, pegalo acá en cada dispositivo, y los datos se sincronizan solos después de cada carga. Paula puede hacer lo mismo con su propia cuenta — datos totalmente separados. El token queda guardado solo en este dispositivo y nunca se sube a ningún lado.</p>
+    <div class="frow"><div>
+      <label class="f">Token de GitHub (solo permiso "gist")</label>
+      <input type="password" id="syncToken" placeholder="ghp_…" autocomplete="off">
+    </div></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn" id="syncConnect">Conectar</button>
+      <button class="btn ghost sm" id="syncBtnNow">Sincronizar ahora</button>
+      <button class="btn ghost sm" id="syncOff">Desconectar</button>
+      <span class="mut" id="syncStatus"></span>
+    </div>
   </div>
 </section>
 
@@ -486,6 +547,7 @@ nav.tabs button{min-height:48px}
 
 <nav class="tabs">
   <button data-v="dash" class="active"><span class="ico">◈</span>Dashboard</button>
+  <button data-v="analisis"><span class="ico">◐</span>Análisis</button>
   <button data-v="carga"><span class="ico">＋</span>Carga</button>
   <button data-v="import"><span class="ico">⇣</span>Importar</button>
   <button data-v="plan"><span class="ico">◎</span>Plan</button>
@@ -527,26 +589,37 @@ const Store = (() => {
   const defaults = () => ({
     version: 1,
     config: { sueldoFijo:0, metaAhorroUSD:200, patARS:0, patUSD:0, diasTrabajo:22 },
+    configTs: 0,
     fx: { valor:null, fuente:null, ts:0, manual:false },
-    propinas: [],          // {id, fecha, monto}
-    movimientos: []        // {id, fecha, monto, categoria, tipo:'fijo'|'boludez'|'ingreso', desc, cuenta, origen, hash}
+    propinas: [],          // {id, fecha, monto, mt}
+    movimientos: [],       // {id, fecha, monto, categoria, tipo, desc, cuenta, origen, hash, mt}
+    metas: [],             // {id, nombre, montoUSD, ts}
+    deleted: [],           // tombstones: ids borrados (para que el sync no los resucite)
+    sync: { token:null, gistId:null, last:0 }
   });
   let state;
   try { state = Object.assign(defaults(), JSON.parse(localStorage.getItem(KEY)||'{}')); }
   catch(e){ state = defaults(); }
-  // merge profundo mínimo para config/fx
+  // merge profundo mínimo para config/fx/sync
   state.config = Object.assign(defaults().config, state.config||{});
   state.fx = Object.assign(defaults().fx, state.fx||{});
-  const save = () => { try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ No se pudo guardar (storage lleno)'); } };
+  state.sync = Object.assign(defaults().sync, state.sync||{});
+  let onSaveCb = null;
+  const save = () => {
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ No se pudo guardar (storage lleno)'); }
+    if (onSaveCb) onSaveCb();
+  };
   // reemplaza el estado in-place (los módulos guardan referencia a `state`)
   function replace(next){
+    const prevSync = state.sync;
     for (const k of Object.keys(state)) delete state[k];
     Object.assign(state, defaults(), next);
     state.config = Object.assign(defaults().config, next.config||{});
     state.fx = Object.assign(defaults().fx, next.fx||{});
+    state.sync = Object.assign(defaults().sync, next.sync || prevSync || {});
     save();
   }
-  return { get:()=>state, save, replace };
+  return { get:()=>state, save, replace, onSave: cb => onSaveCb = cb };
 })();
 
 /* ---------------- FX (Módulo 2: bimonetario) ---------------- */
@@ -584,22 +657,26 @@ const FX = (() => {
 /* ---------------- Ledger ---------------- */
 const Ledger = (() => {
   const S = Store.get();
+  const tomb = id => { S.deleted.push(id); S.deleted = S.deleted.slice(-2000); };
   function addMov(m){
-    m.id = uid();
-    m.hash = m.hash || hashStr([m.fecha,m.monto,m.desc||'',m.cuenta||''].join('|'));
+    m.id = uid(); m.mt = Date.now();
+    // los manuales llevan hash único (dos cafés iguales el mismo día NO son duplicados);
+    // los CSV/PDF traen hash de contenido para dedupe real
+    m.hash = m.hash || 'm-'+m.id;
     S.movimientos.push(m); Store.save();
   }
-  function delMov(id){ S.movimientos = S.movimientos.filter(m=>m.id!==id); Store.save(); }
+  function delMov(id){ S.movimientos = S.movimientos.filter(m=>m.id!==id); tomb(id); Store.save(); }
   function toggleTipo(id){
     const m = S.movimientos.find(x=>x.id===id);
-    if (m && m.tipo!=='ingreso'){ m.tipo = m.tipo==='fijo'?'boludez':'fijo'; Store.save(); }
+    if (m && m.tipo!=='ingreso'){ m.tipo = m.tipo==='fijo'?'boludez':'fijo'; m.mt = Date.now(); Store.save(); }
   }
   function addPropina(fecha, monto){
     const ex = S.propinas.find(p=>p.fecha===fecha);
-    if (ex) ex.monto += monto; else S.propinas.push({id:uid(), fecha, monto});
+    if (ex){ ex.monto += monto; ex.mt = Date.now(); }
+    else S.propinas.push({id:uid(), fecha, monto, mt:Date.now()});
     Store.save();
   }
-  function delPropina(id){ S.propinas = S.propinas.filter(p=>p.id!==id); Store.save(); }
+  function delPropina(id){ S.propinas = S.propinas.filter(p=>p.id!==id); tomb(id); Store.save(); }
   const existsHash = h => S.movimientos.some(m=>m.hash===h);
   return { addMov, delMov, toggleTipo, addPropina, delPropina, existsHash };
 })();
@@ -914,6 +991,101 @@ const Auditor = (() => {
   return { run };
 })();
 
+/* ---------------- Sync: Gist privado de GitHub como nube personal ----------------
+   Merge por registro con last-write-wins (campo mt/ts) + tombstones para borrados.
+   El token vive SOLO en el localStorage de cada dispositivo; nunca viaja al gist. */
+const Sync = (() => {
+  const S = Store.get();
+  const FILE = 'finanzas-os-sync.json';
+  let timer=null, applying=false, busy=false;
+  const st = m => { const el=$('#syncStatus'); if (el) el.textContent=m; };
+  async function gh(path, opts={}){
+    const r = await fetch('https://api.github.com/'+path, {...opts,
+      headers:{ 'Authorization':'Bearer '+S.sync.token, 'Accept':'application/vnd.github+json', ...(opts.headers||{}) }});
+    if (r.status===401 || r.status===403) throw new Error('token inválido o sin permiso "gist"');
+    if (!r.ok && r.status!==404) throw new Error('GitHub respondió '+r.status);
+    return r;
+  }
+  const exportable = () => { const {sync, ...rest} = S; return rest; };
+  function mergeStates(a, b){
+    const del = new Set([...(a.deleted||[]), ...(b.deleted||[])]);
+    const pick = (list, key, ts) => {
+      const map = {};
+      for (const it of list){
+        if (!it || del.has(it.id)) continue;
+        const k = it[key]!=null ? it[key] : it.id;
+        if (!map[k] || (it[ts]||0) > (map[k][ts]||0)) map[k]=it;
+      }
+      return Object.values(map);
+    };
+    const porId = pick([...(a.movimientos||[]), ...(b.movimientos||[])], 'id', 'mt');
+    // segundo pase por hash: el mismo extracto importado en 2 dispositivos genera ids distintos
+    const movimientos = pick(porId, 'hash', 'mt').sort((x,y)=>x.fecha.localeCompare(y.fecha));
+    const propinas = pick([...(a.propinas||[]), ...(b.propinas||[])], 'fecha', 'mt');
+    const metas = pick([...(a.metas||[]), ...(b.metas||[])], 'id', 'ts');
+    const newer = (a.configTs||0) >= (b.configTs||0) ? a : b;
+    const fxN = ((a.fx&&a.fx.ts)||0) >= ((b.fx&&b.fx.ts)||0) ? a.fx : b.fx;
+    return { version:1, config:newer.config, configTs:newer.configTs||0, fx:fxN,
+             propinas, movimientos, metas, deleted:[...del].slice(-2000) };
+  }
+  async function connect(token){
+    S.sync.token = token; st('Conectando…');
+    const list = await (await gh('gists?per_page=100')).json();
+    const found = Array.isArray(list) && list.find(g=>g.files && g.files[FILE]);
+    if (found) S.sync.gistId = found.id;
+    else {
+      const c = await gh('gists', {method:'POST', body: JSON.stringify(
+        {description:'Finanzas OS — sync', public:false, files:{[FILE]:{content: JSON.stringify(exportable())}}})});
+      S.sync.gistId = (await c.json()).id;
+    }
+    applying=true; Store.save(); applying=false;
+    await syncNow(false);
+  }
+  async function pull(){
+    const r = await gh('gists/'+S.sync.gistId);
+    if (r.status===404) return null;
+    const j = await r.json();
+    const f = j.files && j.files[FILE];
+    if (!f) return null;
+    let content = f.content;
+    if (f.truncated) content = await (await fetch(f.raw_url)).text();
+    try { return JSON.parse(content); } catch(e){ return null; }
+  }
+  async function push(){
+    await gh('gists/'+S.sync.gistId, {method:'PATCH', body: JSON.stringify(
+      {files:{[FILE]:{content: JSON.stringify(exportable())}}})});
+  }
+  async function syncNow(silent){
+    if (!S.sync.token || !S.sync.gistId || busy) return;
+    busy=true; st('Sincronizando…');
+    try {
+      const remote = await pull();
+      if (remote){
+        const merged = mergeStates(S, remote);
+        merged.sync = S.sync;
+        applying=true; Store.replace(merged); applying=false;
+      }
+      await push();
+      S.sync.last = Date.now();
+      applying=true; Store.save(); applying=false;
+      UI.renderAll();
+      if (!silent) toast('Sincronizado');
+    } catch(e){
+      st('⚠ '+(e.message||'error de sincronización'));
+      if (!silent) toast('Sync falló: '+(e.message||''));
+    }
+    busy=false;
+  }
+  // auto-sync: 4 s después de la última mutación (agrupa ráfagas de carga)
+  function schedule(){
+    if (applying || !S.sync.token || !S.sync.gistId) return;
+    clearTimeout(timer); timer = setTimeout(()=>syncNow(true), 4000);
+  }
+  function disconnect(){ S.sync.token=null; S.sync.gistId=null; S.sync.last=0; applying=true; Store.save(); applying=false; st('Desconectado'); }
+  return { connect, syncNow, schedule, disconnect };
+})();
+Store.onSave(()=>Sync.schedule());
+
 /* ---------------- UI ---------------- */
 const UI = (() => {
   const S = Store.get();
@@ -976,9 +1148,9 @@ const UI = (() => {
     }
     const data = weeks;
     const max = Math.max(1,...data.map(d=>d.fijo+d.bol));
-    const W=640,H=200,pad=36,bw=Math.min(64,(W-pad*2)/data.length*0.55);
+    const W=640,H=210,pad=36,bw=Math.min(34,(W-pad*2)/data.length*0.42);
     const x=i=>pad+(W-pad*2)*(i+0.5)/data.length;
-    const y=v=>H-28-(H-56)*(v/max);
+    const y=v=>H-30-(H-78)*(v/max);
     let s = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:420px;display:block">`;
     // gridlines
     for (let g=0; g<=3; g++){
@@ -989,11 +1161,11 @@ const UI = (() => {
     data.forEach((d,i)=>{
       const xf=x(i)-bw/2;
       const yF=y(d.fijo), yB=y(d.fijo+d.bol);
-      s+=`<rect x="${xf}" y="${yF}" width="${bw}" height="${(H-28)-yF}" rx="4" fill="#2E5641"/>`;
-      if (d.bol>0) s+=`<rect x="${xf}" y="${yB}" width="${bw}" height="${yF-yB}" rx="4" fill="#C86A5C"/>`;
-      s+=`<text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="11" fill="#6B6A65">${d.lbl}</text>`;
+      s+=`<rect x="${xf}" y="${yF}" width="${bw}" height="${(H-30)-yF}" rx="3" fill="#2E5641"/>`;
+      if (d.bol>0) s+=`<rect x="${xf}" y="${yB}" width="${bw}" height="${yF-yB}" rx="3" fill="#C86A5C"/>`;
+      s+=`<text x="${x(i)}" y="${H-11}" text-anchor="middle" font-size="10.5" fill="#6B6A65">${d.lbl}</text>`;
       const tot=d.fijo+d.bol;
-      if (tot>0) s+=`<text x="${x(i)}" y="${yB-6}" text-anchor="middle" font-size="10.5" font-weight="600" fill="#151513" class="num">${tot>=1000?Math.round(tot/1000)+'k':Math.round(tot)}</text>`;
+      if (tot>0) s+=`<text x="${x(i)}" y="${yB-6}" text-anchor="middle" font-size="10" font-weight="600" fill="#6B6A65" class="num">${tot>=1000?Math.round(tot/1000)+'k':Math.round(tot)}</text>`;
     });
     // leyenda
     s+=`<circle cx="${W-150}" cy="14" r="4" fill="#2E5641"/><text x="${W-142}" y="18" font-size="11" fill="#6B6A65">Fijos</text>`;
@@ -1081,9 +1253,96 @@ const UI = (() => {
           <div class="pct num">−${Math.round(c.pct*100)}%</div>
         </div>`).join('');
     }
+
+    // ------- metas de largo plazo + escenario what-if -------
+    const r2 = FX.rate();
+    const wif = +($('#wifPct').value||0);
+    $('#wifLbl').textContent = wif+'%';
+    const baseAhorro = Math.max(0, M.ahorroProy);
+    const conRecorte = Math.max(0, M.ahorroProy + M.boludProy*wif/100);
+    $('#wifCap').textContent = r2
+      ? `Capacidad de ahorro mensual: hoy ${fmtUSD(baseAhorro/r2)} — con ese recorte, ${fmtUSD(conRecorte/r2)}.`
+      : 'Fijá el tipo de cambio para calcular en USD.';
+    const MN = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const fechaEn = n => { const d=new Date(); d.setMonth(d.getMonth()+n); return MN[d.getMonth()]+' '+d.getFullYear(); };
+    const mesesPara = (usd, ahorro) => (!r2 || ahorro<=0) ? null : Math.ceil(usd*r2/ahorro);
+    const fm = n => n==null ? 'inalcanzable al ritmo actual' : (n>240 ? 'más de 20 años' : n+(n===1?' mes':' meses')+' → '+fechaEn(n));
+    $('#metasList').innerHTML = (S.metas&&S.metas.length) ? S.metas.map(g=>`
+      <div class="cut-row">
+        <div class="cat">${g.nombre}<small class="num">${fmtUSD(g.montoUSD)}${r2?' · '+fmtARS(g.montoUSD*r2):''}</small></div>
+        <div style="flex:1.6;font-size:12.5px" class="num">
+          <div>Hoy: <b>${fm(mesesPara(g.montoUSD, baseAhorro))}</b></div>
+          ${wif>0?`<div style="color:var(--accent)">Con recorte: <b>${fm(mesesPara(g.montoUSD, conRecorte))}</b></div>`:''}
+        </div>
+        <button class="del" onclick="UI.rmMeta('${g.id}')">×</button>
+      </div>`).join('')
+      : '<div class="empty">Agregá tu primera meta — ej: "Mudarme", US$ 3.000.</div>';
+
+    // ------- estado de sincronización -------
+    $('#syncStatus').textContent = S.sync.token
+      ? ('Conectado'+(S.sync.last?' · última sync '+new Date(S.sync.last).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):''))
+      : 'No conectado';
   }
 
-  function renderAll(){ renderDash(); renderCarga(); renderImport(); renderPlan(); }
+  /* ------- análisis por período ------- */
+  const isoDate = d => d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  function renderAnalisis(){
+    const preset = $('#anPreset').value;
+    $('#anMesBox').style.display   = preset==='mes' ? '' : 'none';
+    $('#anDesdeBox').style.display = preset==='custom' ? '' : 'none';
+    $('#anHastaBox').style.display = preset==='custom' ? '' : 'none';
+    const months = [...new Set(S.movimientos.map(m=>monthKey(m.fecha)))].sort().reverse();
+    const curSel = $('#anMes').value;
+    $('#anMes').innerHTML = months.map(mk=>`<option value="${mk}" ${mk===curSel?'selected':''}>${mk}</option>`).join('');
+    const t = new Date(); t.setHours(0,0,0,0);
+    const hoy = isoDate(t);
+    let from, to = hoy;
+    if (preset==='mes-ant'){ const d=new Date(t.getFullYear(), t.getMonth()-1, 1); const mk=monthKey(isoDate(d)); from=mk+'-01'; to=mk+'-31'; }
+    else if (preset==='mes'){ const mk=$('#anMes').value || Engine.ctx().mk; from=mk+'-01'; to=mk+'-31'; }
+    else if (preset==='anio'){ from=t.getFullYear()+'-01-01'; }
+    else if (preset==='custom'){ from=$('#anDesde').value || (Engine.ctx().mk+'-01'); to=$('#anHasta').value || hoy; }
+    else if (preset==='mes-act'){ from=Engine.ctx().mk+'-01'; }
+    else { const d=new Date(t); d.setDate(d.getDate()-(parseInt(preset)-1)); from=isoDate(d); }
+    const movs = S.movimientos.filter(m=>m.fecha>=from && m.fecha<=to);
+    const gastos = movs.filter(m=>m.tipo!=='ingreso');
+    const fij = gastos.filter(m=>m.tipo==='fijo').reduce((a,m)=>a+m.monto,0);
+    const bol = gastos.filter(m=>m.tipo==='boludez').reduce((a,m)=>a+m.monto,0);
+    const tot = fij+bol;
+    const ing = movs.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
+    const endEff = to>hoy ? hoy : to;
+    const dias = Math.max(1, Math.round((Date.parse(endEff)-Date.parse(from))/86400000)+1);
+    const r = FX.rate();
+    $('#anTotal').textContent = fmtARS(tot);
+    $('#anTotalUSD').textContent = r ? fmtUSD(tot/r) : '';
+    $('#anFijos').textContent = fmtARS(fij);
+    $('#anFijosPct').textContent = tot ? Math.round(fij/tot*100)+'% del total' : '—';
+    $('#anBol').textContent = fmtARS(bol);
+    $('#anBolPct').textContent = tot ? Math.round(bol/tot*100)+'% del total' : '—';
+    $('#anProm').textContent = fmtARS(tot/dias);
+    $('#anDias').textContent = dias+' días · '+gastos.length+' movimientos';
+    const byCat = {};
+    for (const m of gastos){ const c = byCat[m.categoria] = byCat[m.categoria]||{f:0,b:0,n:0}; c[m.tipo==='fijo'?'f':'b'] += m.monto; c.n++; }
+    const cats = Object.entries(byCat).map(([cat,v])=>({cat, tot:v.f+v.b, ...v})).sort((a,b)=>b.tot-a.tot);
+    const maxCat = Math.max(1, ...cats.map(c=>c.tot));
+    $('#anCats').innerHTML = cats.length ? cats.map((c,i)=>`
+      <div style="padding:10px 0;${i<cats.length-1?'border-bottom:1px solid var(--line)':''}">
+        <div style="display:flex;justify-content:space-between;gap:10px;font-size:13.5px;margin-bottom:6px">
+          <b>${c.cat} <span class="mut" style="font-weight:400">· ${c.n} mov.</span></b>
+          <span class="num" style="white-space:nowrap">${fmtARS(c.tot)} <span class="duo">· ${tot?Math.round(c.tot/tot*100):0}%${r?' · '+fmtUSD(c.tot/r):''}</span></span>
+        </div>
+        <div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--bg)">
+          <i style="width:${c.f/maxCat*100}%;background:var(--accent)"></i><i style="width:${c.b/maxCat*100}%;background:#C86A5C"></i>
+        </div>
+      </div>`).join('') + `
+      <p class="mut" style="margin-top:12px;font-size:12px">
+        <i style="display:inline-block;width:9px;height:9px;border-radius:99px;background:var(--accent)"></i> Fijo &nbsp;&nbsp;
+        <i style="display:inline-block;width:9px;height:9px;border-radius:99px;background:#C86A5C"></i> Boludez — barras a escala de la categoría más alta
+      </p>`
+      : '<div class="empty">Sin gastos en este período.</div>';
+    $('#anIng').textContent = ing ? `Ingresos registrados en el período: ${fmtARS(ing)}${r?' ('+fmtUSD(ing/r)+')':''}.` : '';
+  }
+
+  function renderAll(){ renderDash(); renderCarga(); renderImport(); renderPlan(); renderAnalisis(); }
 
   /* ------- eventos ------- */
   function bind(){
@@ -1136,8 +1395,30 @@ const UI = (() => {
       S.config.patARS = parseFloat($('#cfgPatARS').value)||0;
       S.config.patUSD = parseFloat($('#cfgPatUSD').value)||0;
       S.config.diasTrabajo = clamp(parseFloat($('#cfgDias').value)||22,1,31);
+      S.configTs = Date.now();
       Store.save(); toast('Parámetros guardados'); renderAll();
     };
+    // análisis: controles de período
+    ['anPreset','anMes','anDesde','anHasta'].forEach(id=>$('#'+id).onchange=()=>renderAnalisis());
+    // metas
+    $('#metaAdd').onclick = ()=>{
+      const nombre = $('#metaNombre').value.trim();
+      const monto = parseFloat($('#metaMonto').value);
+      if (!nombre || !(monto>0)) return toast('Poné nombre y monto en USD');
+      S.metas.push({id:uid(), nombre, montoUSD:monto, ts:Date.now()});
+      $('#metaNombre').value=''; $('#metaMonto').value='';
+      Store.save(); toast('Meta agregada'); renderAll();
+    };
+    $('#wifPct').oninput = ()=>renderPlan();
+    // sincronización
+    $('#syncConnect').onclick = ()=>{
+      const tok = $('#syncToken').value.trim();
+      if (!tok) return toast('Pegá el token primero');
+      $('#syncToken').value='';
+      Sync.connect(tok).catch(e=>{ toast('No pude conectar: '+(e.message||'')); $('#syncStatus').textContent='⚠ '+(e.message||'error'); });
+    };
+    $('#syncBtnNow').onclick = ()=>Sync.syncNow(false);
+    $('#syncOff').onclick = ()=>{ Sync.disconnect(); renderAll(); };
     // import
     const drop = $('#drop'), fi = $('#fileIn');
     drop.onclick = ()=>fi.click();
@@ -1181,7 +1462,8 @@ const UI = (() => {
   return {
     renderAll, bind,
     rm(id){ Ledger.delMov(id); renderAll(); },
-    flip(id){ Ledger.toggleTipo(id); renderAll(); }
+    flip(id){ Ledger.toggleTipo(id); renderAll(); },
+    rmMeta(id){ S.metas = S.metas.filter(g=>g.id!==id); S.deleted.push(id); Store.save(); renderAll(); }
   };
 })();
 
@@ -1190,6 +1472,8 @@ UI.bind();
 FX.render();
 UI.renderAll();
 FX.refresh();
+// si hay sync configurado, traer novedades al abrir
+if (Store.get().sync.token) Sync.syncNow(true);
 // refresco de cotización cada 30 min mientras esté abierto
 setInterval(()=>FX.refresh(), 30*60*1000);
 </script>
