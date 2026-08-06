@@ -482,13 +482,7 @@ nav.tabs button{min-height:48px}
           <input type="number" id="cfgPatARS" inputmode="decimal" step="any">
         </div>
         <div>
-          <label class="f">Ahorros en USD</label>
-          <input type="number" id="cfgPatUSD" inputmode="decimal" step="any">
-        </div>
-      </div>
-      <div class="frow">
-        <div>
-          <label class="f">Días de laburo por mes (para proyectar propinas)</label>
+          <label class="f">Días de laburo por mes</label>
           <input type="number" id="cfgDias" inputmode="numeric" min="1" max="31" step="1">
         </div>
       </div>
@@ -510,6 +504,41 @@ nav.tabs button{min-height:48px}
         <tr><td><b>Límite diario restante</b></td><td class="r num" id="mLim" style="font-weight:700">—</td></tr>
       </table>
     </div>
+  </div>
+
+  <h2 class="st">Ahorros</h2>
+  <div class="card">
+    <div class="grid g3" style="gap:10px;margin-bottom:4px">
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">En pesos</div>
+        <div class="num" style="font-size:19px;font-weight:700" id="ahSaldoARS">—</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">En dólares</div>
+        <div class="num" style="font-size:19px;font-weight:700" id="ahSaldoUSD">—</div>
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3)">Total ahorrado</div>
+        <div class="num" style="font-size:19px;font-weight:700;color:var(--accent)" id="ahSaldoTot">—</div>
+      </div>
+    </div>
+    <hr class="hr">
+    <div class="frow">
+      <div><label class="f">Monto</label><input type="number" id="ahMonto" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+      <div><label class="f">Moneda</label><select id="ahMoneda"><option>USD</option><option>ARS</option></select></div>
+      <div><label class="f">Fecha</label><input type="date" id="ahFecha"></div>
+    </div>
+    <div style="margin-bottom:12px">
+      <label class="f">Movimiento</label>
+      <div class="seg" id="ahTipo">
+        <button type="button" data-t="aporte" class="on fijo">Aporte · guardo plata</button>
+        <button type="button" data-t="retiro" class="boludez">Retiro · saco plata</button>
+      </div>
+    </div>
+    <div class="frow"><div><label class="f">Nota (opcional)</label><input id="ahNota" placeholder="Saldo inicial, plazo fijo, compra de dólares…"></div></div>
+    <button class="btn accent wide" id="ahAdd">Registrar movimiento de ahorro</button>
+    <p class="mut" style="margin-top:10px">¿Ya tenías plata ahorrada antes de arrancar? Registrá un aporte con nota "Saldo inicial". Los aportes y retiros <b>en pesos</b> ajustan tu efectivo del patrimonio automáticamente; si comprás dólares con tu efectivo, corregí el efectivo la próxima vez que lo cuentes en Parámetros.</p>
+    <div id="ahTable" style="margin-top:14px"></div>
   </div>
 
   <h2 class="st">Simulador de recortes</h2>
@@ -598,6 +627,7 @@ const Store = (() => {
     propinas: [],          // {id, fecha, monto, mt}
     movimientos: [],       // {id, fecha, monto, categoria, tipo, desc, cuenta, origen, hash, mt}
     metas: [],             // {id, nombre, montoUSD, ts}
+    ahorros: [],           // {id, fecha, moneda:'ARS'|'USD', monto, tipo:'aporte'|'retiro', nota, mt}
     deleted: [],           // tombstones: ids borrados (para que el sync no los resucite)
     sync: { last:0 }
   });
@@ -611,6 +641,13 @@ const Store = (() => {
   // migración: el patrimonio dinámico arranca a contar desde ahora, no retroactivo
   // (lo cargado antes de este momento ya estaba reflejado en el conteo manual)
   if (!state.config.patSetAt) state.config.patSetAt = Date.now();
+  // migración: el viejo campo "Ahorros en USD" pasa a ser el primer movimiento de la caja de ahorros
+  if (state.config.patUSD > 0 && !(state.ahorros||[]).length){
+    state.ahorros = state.ahorros || [];
+    state.ahorros.push({ id: uid(), fecha: todayISO(), moneda:'USD', monto: state.config.patUSD, tipo:'aporte', nota:'Saldo inicial', mt: Date.now() });
+    state.config.patUSD = 0;
+    state.configTs = Date.now();
+  }
   let onSaveCb = null;
   const save = () => {
     try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){ toast('⚠ No se pudo guardar (storage lleno)'); }
@@ -684,8 +721,10 @@ const Ledger = (() => {
     Store.save();
   }
   function delPropina(id){ S.propinas = S.propinas.filter(p=>p.id!==id); tomb(id); Store.save(); }
+  function addAhorro(h){ h.id = uid(); h.mt = Date.now(); S.ahorros.push(h); Store.save(); }
+  function delAhorro(id){ S.ahorros = S.ahorros.filter(x=>x.id!==id); tomb(id); Store.save(); }
   const existsHash = h => S.movimientos.some(m=>m.hash===h);
-  return { addMov, delMov, toggleTipo, addPropina, delPropina, existsHash };
+  return { addMov, delMov, toggleTipo, addPropina, delPropina, addAhorro, delAhorro, existsHash };
 })();
 
 /* ---------------- Ingest (Módulo 1: CSV) ---------------- */
@@ -906,7 +945,17 @@ const Engine = (() => {
              ingresoProy, fijosProy, metaARS, presupuestoBolud, restante,
              limiteDiario, boludProy, ahorroProy, gastadoHoy };
   }
-  /* Patrimonio dinámico: conteo base + todo lo registrado a mano DESPUÉS de guardar el conteo.
+  /* Caja de ahorros: saldos por moneda a partir de los movimientos aporte/retiro */
+  function ahorros(){
+    let ars=0, usd=0;
+    for (const h of S.ahorros){
+      const s = h.tipo==='retiro' ? -1 : 1;
+      if (h.moneda==='USD') usd += s*h.monto; else ars += s*h.monto;
+    }
+    const rate = FX.rate();
+    return { ars, usd, totalARS: ars + usd*rate, totalUSD: rate ? ars/rate + usd : usd };
+  }
+  /* Patrimonio dinámico: efectivo (conteo base + movimientos manuales posteriores) + caja de ahorros.
      Los extractos importados (csv/pdf) no ajustan: esa plata ya estaba contada en el banco. */
   function patrimonio(){
     const rate = FX.rate();
@@ -917,8 +966,15 @@ const Engine = (() => {
       if (m.origen !== 'manual' || (m.mt||0) <= t0) continue;
       delta += m.tipo==='ingreso' ? m.monto : -m.monto;
     }
-    const ars = S.config.patARS + S.config.patUSD * rate + delta;
-    return { ars, usd: rate? ars/rate : 0, delta };
+    // los aportes en pesos salen del efectivo (y los retiros vuelven a él)
+    for (const h of S.ahorros){
+      if (h.moneda==='USD' || (h.mt||0) <= t0) continue;
+      delta += h.tipo==='retiro' ? h.monto : -h.monto;
+    }
+    const A = ahorros();
+    const efectivo = S.config.patARS + delta;
+    const ars = efectivo + A.totalARS;
+    return { ars, usd: rate? ars/rate : 0, delta, efectivo };
   }
   function categoriasBoludez(){
     const c = ctx();
@@ -951,7 +1007,7 @@ const Engine = (() => {
     }).filter(i=>i.recorte>=1);
     return { gap, target, factible, cats:items };
   }
-  return { ctx, mes, patrimonio, categoriasBoludez, simulador, propinasStats };
+  return { ctx, mes, patrimonio, ahorros, categoriasBoludez, simulador, propinasStats };
 })();
 
 /* ---------------- Auditor (Módulo 4: reglas) ---------------- */
@@ -1061,10 +1117,11 @@ const Sync = (() => {
     const movimientos = pick(porId, 'hash', 'mt').sort((x,y)=>x.fecha.localeCompare(y.fecha));
     const propinas = pick([...(a.propinas||[]), ...(b.propinas||[])], 'fecha', 'mt');
     const metas = pick([...(a.metas||[]), ...(b.metas||[])], 'id', 'ts');
+    const ahorros = pick([...(a.ahorros||[]), ...(b.ahorros||[])], 'id', 'mt');
     const newer = (a.configTs||0) >= (b.configTs||0) ? a : b;
     const fxN = ((a.fx&&a.fx.ts)||0) >= ((b.fx&&b.fx.ts)||0) ? a.fx : b.fx;
     return { version:1, config:newer.config, configTs:newer.configTs||0, fx:fxN,
-             propinas, movimientos, metas, deleted:[...del].slice(-2000) };
+             propinas, movimientos, metas, ahorros, deleted:[...del].slice(-2000) };
   }
   const ref = () => db.collection('estados').doc(usr.uid);
   async function syncNow(silent){
@@ -1103,6 +1160,7 @@ Store.onSave(()=>Sync.schedule());
 const UI = (() => {
   const S = Store.get();
   let gTipo = 'boludez';
+  let ahTipo = 'aporte';
 
   function duo(ars){ const r=FX.rate(); return r? `${fmtARS(ars)} <span class="duo num">· ${fmtUSD(ars/r)}</span>` : fmtARS(ars); }
 
@@ -1113,7 +1171,8 @@ const UI = (() => {
     $('#dashSub').textContent = `${meses[new Date().getMonth()]} · día ${M.day} de ${M.dim} · quedan ${M.diasRestantes} días`;
 
     $('#kPatARS').textContent = fmtARS(P.ars);
-    $('#kPatUSD').textContent = FX.rate()? fmtUSD(P.usd) : 'fijá el tipo de cambio';
+    const AHd = Engine.ahorros();
+    $('#kPatUSD').textContent = FX.rate()? fmtUSD(P.usd)+' · ahorrado '+fmtUSD(AHd.totalUSD) : 'fijá el tipo de cambio';
 
     const meta = M.metaARS;
     $('#kAhorro').innerHTML = fmtARS(M.ahorroProy);
@@ -1253,8 +1312,8 @@ const UI = (() => {
     $('#cfgSueldo').value = S.config.sueldoFijo||'';
     $('#cfgMeta').value = S.config.metaAhorroUSD||'';
     $('#cfgPatARS').value = S.config.patARS||'';
-    $('#cfgPatUSD').value = S.config.patUSD||'';
     $('#cfgDias').value = S.config.diasTrabajo||22;
+    if(!$('#ahFecha').value) $('#ahFecha').value = todayISO();
     const M = Engine.mes();
     $('#mIng').innerHTML = duo(M.ingresoProy);
     $('#mSueldo').textContent = fmtARS(S.config.sueldoFijo);
@@ -1292,19 +1351,47 @@ const UI = (() => {
     $('#wifCap').textContent = r2
       ? `Capacidad de ahorro mensual: hoy ${fmtUSD(baseAhorro/r2)} — con ese recorte, ${fmtUSD(conRecorte/r2)}.`
       : 'Fijá el tipo de cambio para calcular en USD.';
+    // ------- caja de ahorros -------
+    const AH = Engine.ahorros();
+    $('#ahSaldoARS').textContent = fmtARS(AH.ars);
+    $('#ahSaldoUSD').textContent = fmtUSD(AH.usd);
+    $('#ahSaldoTot').textContent = r2 ? fmtUSD(AH.totalUSD)+' · '+fmtARS(AH.totalARS) : fmtUSD(AH.usd);
+    const ahs = S.ahorros.slice().sort((a,b)=>b.fecha.localeCompare(a.fecha));
+    $('#ahTable').innerHTML = ahs.length ? `<table>
+      <tr><th>Fecha</th><th>Nota</th><th>Tipo</th><th class="r">Monto</th><th></th></tr>
+      ${ahs.map(h=>`<tr>
+        <td class="num" style="white-space:nowrap">${h.fecha.slice(5)}</td>
+        <td>${h.nota||'<span class="mut">—</span>'}</td>
+        <td><span class="pill ${h.tipo==='aporte'?'fijo':'boludez'}">${h.tipo}</span></td>
+        <td class="r num edita" title="Tocar para corregir" onclick="UI.editAhorro('${h.id}')">${h.tipo==='retiro'?'−':'+'}${h.moneda==='USD'?fmtUSD(h.monto):fmtARS(h.monto)}</td>
+        <td class="r"><button class="del" onclick="UI.rmAhorro('${h.id}')">×</button></td>
+      </tr>`).join('')}
+    </table>` : '<div class="empty">Sin movimientos de ahorro todavía. Arrancá con tu "Saldo inicial".</div>';
+
+    // ------- metas: progreso real (ahorrado) + proyección -------
     const MN = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
     const fechaEn = n => { const d=new Date(); d.setMonth(d.getMonth()+n); return MN[d.getMonth()]+' '+d.getFullYear(); };
-    const mesesPara = (usd, ahorro) => (!r2 || ahorro<=0) ? null : Math.ceil(usd*r2/ahorro);
-    const fm = n => n==null ? 'inalcanzable al ritmo actual' : (n>240 ? 'más de 20 años' : n+(n===1?' mes':' meses')+' → '+fechaEn(n));
-    $('#metasList').innerHTML = (S.metas&&S.metas.length) ? S.metas.map(g=>`
+    const mesesPara = (usd, ahorro) => {
+      if (!r2) return null;
+      const restante = usd*r2 - AH.totalARS;   // lo ya ahorrado cuenta para la meta
+      if (restante <= 0) return 0;
+      return ahorro>0 ? Math.ceil(restante/ahorro) : null;
+    };
+    const fm = n => n==null ? 'inalcanzable al ritmo actual' : (n===0 ? '¡ya lo tenés ahorrado!' : (n>240 ? 'más de 20 años' : n+(n===1?' mes':' meses')+' → '+fechaEn(n)));
+    $('#metasList').innerHTML = (S.metas&&S.metas.length) ? S.metas.map(g=>{
+      const pct = r2 ? Math.round(clamp(AH.totalARS/(g.montoUSD*r2)*100,0,100)) : 0;
+      return `
       <div class="cut-row">
-        <div class="cat">${g.nombre}<small class="num">${fmtUSD(g.montoUSD)}${r2?' · '+fmtARS(g.montoUSD*r2):''}</small></div>
+        <div class="cat">${g.nombre}
+          <small class="num">${fmtUSD(g.montoUSD)}${r2?' · llevás '+fmtUSD(AH.totalUSD)+' ('+pct+'%)':''}</small>
+          <div class="bar" style="margin-top:6px;max-width:180px"><i style="width:${pct}%"></i></div>
+        </div>
         <div style="flex:1.6;font-size:12.5px" class="num">
           <div>Hoy: <b>${fm(mesesPara(g.montoUSD, baseAhorro))}</b></div>
           ${wif>0?`<div style="color:var(--accent)">Con recorte: <b>${fm(mesesPara(g.montoUSD, conRecorte))}</b></div>`:''}
         </div>
         <button class="del" onclick="UI.rmMeta('${g.id}')">×</button>
-      </div>`).join('')
+      </div>`;}).join('')
       : '<div class="empty">Agregá tu primera meta — ej: "Mudarme", US$ 3.000.</div>';
 
     // ------- cuenta / sincronización -------
@@ -1446,11 +1533,9 @@ const UI = (() => {
       S.config.sueldoFijo = parseFloat($('#cfgSueldo').value)||0;
       S.config.metaAhorroUSD = parseFloat($('#cfgMeta').value)||0;
       const nPatARS = parseFloat($('#cfgPatARS').value)||0;
-      const nPatUSD = parseFloat($('#cfgPatUSD').value)||0;
-      // si recontaste tu plata, el conteo pasa a ser el nuevo punto de partida
-      if (nPatARS !== S.config.patARS || nPatUSD !== S.config.patUSD) S.config.patSetAt = Date.now();
+      // si recontaste tu efectivo, el conteo pasa a ser el nuevo punto de partida
+      if (nPatARS !== S.config.patARS) S.config.patSetAt = Date.now();
       S.config.patARS = nPatARS;
-      S.config.patUSD = nPatUSD;
       S.config.diasTrabajo = clamp(parseFloat($('#cfgDias').value)||22,1,31);
       S.configTs = Date.now();
       Store.save(); toast('Parámetros guardados'); renderAll();
@@ -1467,6 +1552,20 @@ const UI = (() => {
       Store.save(); toast('Meta agregada'); renderAll();
     };
     $('#wifPct').oninput = ()=>renderPlan();
+    // ahorros
+    $$('#ahTipo button').forEach(b=>b.onclick=()=>{
+      $$('#ahTipo button').forEach(x=>x.classList.remove('on'));
+      b.classList.add('on'); ahTipo = b.dataset.t;
+    });
+    $('#ahAdd').onclick = ()=>{
+      const monto = parseFloat($('#ahMonto').value);
+      if (!(monto>0)) return toast('Poné un monto');
+      Ledger.addAhorro({ fecha: $('#ahFecha').value||todayISO(), moneda: $('#ahMoneda').value,
+                         monto, tipo: ahTipo, nota: $('#ahNota').value.trim() });
+      $('#ahMonto').value=''; $('#ahNota').value='';
+      toast(ahTipo==='aporte' ? 'Aporte registrado' : 'Retiro registrado');
+      renderAll();
+    };
     // import
     const drop = $('#drop'), fi = $('#fileIn');
     drop.onclick = ()=>fi.click();
@@ -1533,6 +1632,15 @@ const UI = (() => {
     setCat(id, cat){
       const m = S.movimientos.find(x=>x.id===id); if (!m) return;
       m.categoria = cat; m.mt = Date.now(); Store.save(); renderAll();
+    },
+    rmAhorro(id){ Ledger.delAhorro(id); renderAll(); },
+    editAhorro(id){
+      const h = S.ahorros.find(x=>x.id===id); if (!h) return;
+      const v = prompt(h.tipo+' del '+h.fecha+' ('+h.moneda+'):', h.monto);
+      if (v===null) return;
+      const n = parseFloat(String(v).replace(',','.'));
+      if (n>0){ h.monto=n; h.mt=Date.now(); Store.save(); renderAll(); }
+      else toast('Monto inválido');
     }
   };
 })();
