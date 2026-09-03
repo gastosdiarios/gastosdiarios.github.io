@@ -384,6 +384,17 @@ nav.tabs button{min-height:48px}
       </div>
 
       <div class="card" style="margin-top:14px">
+        <h2 class="st" style="margin-top:0">Cobro del mes (sueldo)</h2>
+        <div class="frow">
+          <div style="flex:0.8"><label class="f">Mes</label><input type="month" id="cbMes"></div>
+          <div><label class="f">En efectivo (ARS)</label><input type="number" id="cbEf" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+          <div><label class="f">Transferencia (ARS)</label><input type="number" id="cbTr" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+        </div>
+        <button class="btn wide" id="cbSave">Guardar cobro del mes</button>
+        <div id="cbTable" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card" style="margin-top:14px">
         <h2 class="st" style="margin-top:0">Otro ingreso puntual</h2>
         <div class="frow">
           <div>
@@ -468,7 +479,7 @@ nav.tabs button{min-height:48px}
       <h2 class="st" style="margin-top:0">Parámetros</h2>
       <div class="frow">
         <div>
-          <label class="f">Sueldo fijo mensual (ARS)</label>
+          <label class="f">Sueldo de referencia (ARS) — se usa si no cargaste el cobro del mes</label>
           <input type="number" id="cfgSueldo" inputmode="decimal" min="0" step="any">
         </div>
         <div>
@@ -494,7 +505,7 @@ nav.tabs button{min-height:48px}
       <h2 class="st" style="margin-top:0">Motor de proyección · este mes</h2>
       <table>
         <tr><td>Ingreso proyectado</td><td class="r num" id="mIng">—</td></tr>
-        <tr><td style="padding-left:22px;color:var(--ink-2)">Sueldo fijo</td><td class="r num mut" id="mSueldo">—</td></tr>
+        <tr><td style="padding-left:22px;color:var(--ink-2)">Sueldo / cobro del mes</td><td class="r num mut" id="mSueldo">—</td></tr>
         <tr><td style="padding-left:22px;color:var(--ink-2)">Propinas proyectadas</td><td class="r num mut" id="mProp">—</td></tr>
         <tr><td style="padding-left:22px;color:var(--ink-2)">Otros ingresos</td><td class="r num mut" id="mOtros">—</td></tr>
         <tr><td>Gastos fijos proyectados</td><td class="r num" id="mFijos">—</td></tr>
@@ -628,6 +639,7 @@ const Store = (() => {
     movimientos: [],       // {id, fecha, monto, categoria, tipo, desc, cuenta, origen, hash, mt}
     metas: [],             // {id, nombre, montoUSD, ts}
     ahorros: [],           // {id, fecha, moneda:'ARS'|'USD', monto, tipo:'aporte'|'retiro', nota, mt}
+    cobros: {},            // 'YYYY-MM' → {efectivo, transferencia, mt} — el sueldo cobrado cada mes
     deleted: [],           // tombstones: ids borrados (para que el sync no los resucite)
     sync: { last:0 }
   });
@@ -638,6 +650,7 @@ const Store = (() => {
   state.config = Object.assign(defaults().config, state.config||{});
   state.fx = Object.assign(defaults().fx, state.fx||{});
   state.sync = Object.assign(defaults().sync, state.sync||{});
+  state.cobros = state.cobros || {};
   // migración: el patrimonio dinámico arranca a contar desde ahora, no retroactivo
   // (lo cargado antes de este momento ya estaba reflejado en el conteo manual)
   if (!state.config.patSetAt) state.config.patSetAt = Date.now();
@@ -911,17 +924,34 @@ const Engine = (() => {
     const diasRestantes = dim - day + 1; // incluye hoy
     return { mk, dim, day, diasRestantes };
   }
+  const iso28atras = () => {
+    const d = new Date(); d.setDate(d.getDate()-27);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  };
   function propinasStats(){
     const c = ctx();
     const mes = S.propinas.filter(p=>monthKey(p.fecha)===c.mk);
-    // promedio sobre días con carga (no sobre días calendario): refleja tu ritmo real de laburo
     const dias = new Set(mes.map(p=>p.fecha)).size;
     const total = mes.reduce((a,p)=>a+p.monto,0);
-    const prom = dias ? total/dias : 0;
-    // proyección: lo ya cobrado + promedio × días de laburo que faltan del mes
+    // promedio por día trabajado sobre los últimos 28 días: estable entre meses
+    // (antes, el 1° de cada mes la proyección de propinas arrancaba en cero)
+    const ult = S.propinas.filter(p=>p.fecha>=iso28atras());
+    const diasU = new Set(ult.map(p=>p.fecha)).size;
+    const prom = diasU ? ult.reduce((a,p)=>a+p.monto,0)/diasU : 0;
     const diasTrabajo = S.config.diasTrabajo || 22;
-    const proyeccion = dias ? total + prom * Math.max(0, diasTrabajo - dias) : 0;
+    const proyeccion = total + prom * Math.max(0, diasTrabajo - dias);
     return { total, prom, dias, diasTrabajo, proyeccion };
+  }
+  // ritmo diario de boludeces por categoría, últimos 28 días
+  function catRates28(){
+    const desde = iso28atras(), hoy = todayISO();
+    const map = {};
+    for (const m of S.movimientos){
+      if (m.tipo!=='boludez' || m.fecha<desde || m.fecha>hoy) continue;
+      map[m.categoria] = (map[m.categoria]||0) + m.monto;
+    }
+    for (const k in map) map[k] /= 28;
+    return map;
   }
   function mes(){
     const c = ctx();
@@ -930,19 +960,33 @@ const Engine = (() => {
     const boludGastado   = movs.filter(m=>m.tipo==='boludez').reduce((a,m)=>a+m.monto,0);
     const otrosIngresos  = movs.filter(m=>m.tipo==='ingreso').reduce((a,m)=>a+m.monto,0);
     const p = propinasStats();
-    const ingresoProy = S.config.sueldoFijo + p.proyeccion + otrosIngresos;
-    // fijos proyectados: lo gastado + run-rate del resto del mes (conservador: mismo ritmo)
-    const fijosProy = c.day>0 ? fijosGastado * (c.dim/c.day) : fijosGastado;
+    // sueldo: el cobro real del mes si está cargado; si no, el del mes anterior; si no, el fijo de referencia
+    const cbAct = (S.cobros||{})[c.mk];
+    let sueldoProy = cbAct ? (cbAct.efectivo||0)+(cbAct.transferencia||0) : 0;
+    if (!(sueldoProy>0)){
+      const pd = new Date(); pd.setDate(1); pd.setMonth(pd.getMonth()-1);
+      const cbAnt = (S.cobros||{})[pd.getFullYear()+'-'+String(pd.getMonth()+1).padStart(2,'0')];
+      const antTot = cbAnt ? (cbAnt.efectivo||0)+(cbAnt.transferencia||0) : 0;
+      sueldoProy = antTot>0 ? antTot : S.config.sueldoFijo;
+    }
+    const ingresoProy = sueldoProy + p.proyeccion + otrosIngresos;
+    // gastos proyectados por ritmo de los últimos 28 días (cruza meses):
+    // sin el efecto "×10" de extrapolar los primeros días del mes
+    const desde28 = iso28atras(), hoyI = todayISO();
+    const ult28 = S.movimientos.filter(m=>m.fecha>=desde28 && m.fecha<=hoyI);
+    const fijosRate = ult28.filter(m=>m.tipo==='fijo').reduce((a,m)=>a+m.monto,0)/28;
+    const boludRate = ult28.filter(m=>m.tipo==='boludez').reduce((a,m)=>a+m.monto,0)/28;
+    const fijosProy = fijosGastado + fijosRate * (c.dim - c.day);
+    const boludProy = boludGastado + boludRate * (c.dim - c.day);
     const metaARS = S.config.metaAhorroUSD * FX.rate();
     const presupuestoBolud = ingresoProy - fijosProy - metaARS;
     const restante = presupuestoBolud - boludGastado;
     const limiteDiario = c.diasRestantes>0 ? restante / c.diasRestantes : 0;
-    const boludProy = c.day>0 ? boludGastado * (c.dim/c.day) : 0;
     const ahorroProy = ingresoProy - fijosProy - boludProy;
     const hoy = todayISO();
     const gastadoHoy = movs.filter(m=>m.tipo==='boludez'&&m.fecha===hoy).reduce((a,m)=>a+m.monto,0);
     return { ...c, movs, fijosGastado, boludGastado, otrosIngresos, propinas:p,
-             ingresoProy, fijosProy, metaARS, presupuestoBolud, restante,
+             sueldoProy, ingresoProy, fijosProy, metaARS, presupuestoBolud, restante,
              limiteDiario, boludProy, ahorroProy, gastadoHoy };
   }
   /* Caja de ahorros: saldos por moneda a partir de los movimientos aporte/retiro */
@@ -971,6 +1015,11 @@ const Engine = (() => {
       if (h.moneda==='USD' || (h.mt||0) <= t0) continue;
       delta += h.tipo==='retiro' ? h.monto : -h.monto;
     }
+    // el cobro mensual (efectivo + transferencia) entra al efectivo
+    for (const cb of Object.values(S.cobros||{})){
+      if ((cb.mt||0) <= t0) continue;
+      delta += (cb.efectivo||0) + (cb.transferencia||0);
+    }
     const A = ahorros();
     const efectivo = S.config.patARS + delta;
     const ars = efectivo + A.totalARS;
@@ -997,17 +1046,18 @@ const Engine = (() => {
     const restanteProy = M.boludProy - M.boludGastado;
     const factible = restanteProy >= gap;
     const target = Math.min(gap, Math.max(0,restanteProy));
+    const rates = catRates28();
     const items = cats.map(([cat,monto])=>{
       const peso = monto/totalBolud;
       const recorte = target * peso;
-      const proyCat = M.day>0 ? monto*(M.dim/M.day) : monto;
+      const proyCat = monto + (rates[cat]||0)*(M.dim - M.day);
       const restCat = proyCat - monto;
       const pct = restCat>0 ? clamp(recorte/restCat,0,1) : 0;
       return { cat, gastado:monto, recorte, pct };
     }).filter(i=>i.recorte>=1);
     return { gap, target, factible, cats:items };
   }
-  return { ctx, mes, patrimonio, ahorros, categoriasBoludez, simulador, propinasStats };
+  return { ctx, mes, patrimonio, ahorros, categoriasBoludez, simulador, propinasStats, catRates28 };
 })();
 
 /* ---------------- Auditor (Módulo 4: reglas) ---------------- */
@@ -1036,7 +1086,7 @@ const Auditor = (() => {
     const cats = Engine.categoriasBoludez();
     if (cats.length && M.day>=5 && M.presupuestoBolud>0){
       const [cat, monto] = cats[0];
-      const proyCat = monto*(M.dim/M.day);
+      const proyCat = monto + (Engine.catRates28()[cat]||0)*(M.dim - M.day);
       if (proyCat > M.presupuestoBolud*0.4)
         A.push({lvl:'warn', msg:`<b>Estás gastando de más en ${cat}.</b> ${fmtARS(monto)} en ${M.day} días → proyecta ${fmtARS(proyCat)}, ${Math.round(proyCat/M.presupuestoBolud*100)}% de todo tu presupuesto de boludeces.`});
     }
@@ -1118,10 +1168,14 @@ const Sync = (() => {
     const propinas = pick([...(a.propinas||[]), ...(b.propinas||[])], 'fecha', 'mt');
     const metas = pick([...(a.metas||[]), ...(b.metas||[])], 'id', 'ts');
     const ahorros = pick([...(a.ahorros||[]), ...(b.ahorros||[])], 'id', 'mt');
+    const cobros = {};
+    for (const src of [a.cobros||{}, b.cobros||{}])
+      for (const [k,v] of Object.entries(src))
+        if (!cobros[k] || (v.mt||0) > (cobros[k].mt||0)) cobros[k]=v;
     const newer = (a.configTs||0) >= (b.configTs||0) ? a : b;
     const fxN = ((a.fx&&a.fx.ts)||0) >= ((b.fx&&b.fx.ts)||0) ? a.fx : b.fx;
     return { version:1, config:newer.config, configTs:newer.configTs||0, fx:fxN,
-             propinas, movimientos, metas, ahorros, deleted:[...del].slice(-2000) };
+             propinas, movimientos, metas, ahorros, cobros, deleted:[...del].slice(-2000) };
   }
   const ref = () => db.collection('estados').doc(usr.uid);
   async function syncNow(silent){
@@ -1297,6 +1351,25 @@ const UI = (() => {
         <td class="r num" style="font-weight:700">${fmtARS(totP)}</td>
         ${r?`<td class="r num duo">${fmtUSD(totP/r)}</td>`:''}<td></td></tr>
     </table>` : '<div class="empty">Sin propinas cargadas este mes.</div>';
+    // cobro del mes: mes por defecto + prefill si ya existe
+    if (!$('#cbMes').value){
+      $('#cbMes').value = cur;
+      const cb0 = (S.cobros||{})[cur];
+      if (cb0){ $('#cbEf').value = cb0.efectivo||''; $('#cbTr').value = cb0.transferencia||''; }
+    }
+    const cbs = Object.entries(S.cobros||{})
+      .filter(([,v]) => ((v.efectivo||0)+(v.transferencia||0)) > 0)
+      .sort((a,b)=>b[0].localeCompare(a[0]));
+    $('#cbTable').innerHTML = cbs.length ? `<table>
+      <tr><th>Mes</th><th class="r">Efectivo</th><th class="r">Transf.</th><th class="r">Total</th><th></th></tr>
+      ${cbs.map(([mk,v])=>`<tr>
+        <td>${lblMes(mk)}</td>
+        <td class="r num">${fmtARS(v.efectivo||0)}</td>
+        <td class="r num">${fmtARS(v.transferencia||0)}</td>
+        <td class="r num" style="font-weight:600">${fmtARS((v.efectivo||0)+(v.transferencia||0))}</td>
+        <td class="r"><button class="del" onclick="UI.rmCobro('${mk}')">×</button></td>
+      </tr>`).join('')}
+    </table>` : '<p class="mut">Cargá acá lo que cobrás cada mes, separado en efectivo y transferencia. Se suma a tus ingresos proyectados y a tu patrimonio.</p>';
   }
 
   function renderImport(){
@@ -1316,7 +1389,7 @@ const UI = (() => {
     if(!$('#ahFecha').value) $('#ahFecha').value = todayISO();
     const M = Engine.mes();
     $('#mIng').innerHTML = duo(M.ingresoProy);
-    $('#mSueldo').textContent = fmtARS(S.config.sueldoFijo);
+    $('#mSueldo').textContent = fmtARS(M.sueldoProy);
     $('#mProp').textContent = fmtARS(M.propinas.proyeccion);
     $('#mOtros').textContent = fmtARS(M.otrosIngresos);
     $('#mFijos').innerHTML = '− '+duo(M.fijosProy);
@@ -1499,6 +1572,20 @@ const UI = (() => {
     $('#fxPill').onclick = ()=>FX.setManual();
     // selector de mes del historial
     $('#movMes').onchange = e=>{ movMonth = e.target.value; renderCarga(); };
+    // cobro del mes
+    $('#cbMes').onchange = ()=>{
+      const cb = (S.cobros||{})[$('#cbMes').value];
+      $('#cbEf').value = cb ? (cb.efectivo||'') : '';
+      $('#cbTr').value = cb ? (cb.transferencia||'') : '';
+    };
+    $('#cbSave').onclick = ()=>{
+      const mk = $('#cbMes').value || Engine.ctx().mk;
+      const ef = parseFloat($('#cbEf').value)||0;
+      const tr = parseFloat($('#cbTr').value)||0;
+      if (!(ef+tr>0)) return toast('Poné al menos un monto');
+      S.cobros[mk] = { efectivo:ef, transferencia:tr, mt:Date.now() };
+      Store.save(); toast('Cobro del mes guardado'); renderAll();
+    };
     // segmentado
     $$('#gTipo button').forEach(b=>b.onclick=()=>{
       $$('#gTipo button').forEach(x=>x.classList.remove('on'));
@@ -1634,6 +1721,12 @@ const UI = (() => {
       m.categoria = cat; m.mt = Date.now(); Store.save(); renderAll();
     },
     rmAhorro(id){ Ledger.delAhorro(id); renderAll(); },
+    rmCobro(mk){
+      if (!window.confirm('¿Borrar el cobro de '+mk+'?')) return;
+      // se marca en cero (no se elimina la clave) para que el sync propague el borrado
+      S.cobros[mk] = { efectivo:0, transferencia:0, mt:Date.now() };
+      Store.save(); renderAll();
+    },
     editAhorro(id){
       const h = S.ahorros.find(x=>x.id===id); if (!h) return;
       const v = prompt(h.tipo+' del '+h.fecha+' ('+h.moneda+'):', h.monto);
